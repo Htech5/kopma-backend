@@ -3,6 +3,48 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchWithRetry(url, options = {}, config = {}) {
+  const {
+    retries = 3,
+    initialDelay = 800,
+    factor = 2,
+    maxDelay = 4000,
+    retryOnStatuses = [429, 502, 503, 504],
+  } = config;
+
+  let attempt = 0;
+  let delay = initialDelay;
+
+  while (true) {
+    try {
+      const response = await fetch(url, options);
+
+      if (response.ok) {
+        return response;
+      }
+
+      const shouldRetry =
+        retryOnStatuses.includes(response.status) && attempt < retries;
+
+      if (!shouldRetry) {
+        return response;
+      }
+    } catch (error) {
+      if (attempt >= retries) {
+        throw error;
+      }
+    }
+
+    await wait(delay);
+    delay = Math.min(delay * factor, maxDelay);
+    attempt += 1;
+  }
+}
+
 export default function LoginPage() {
   const router = useRouter();
 
@@ -16,23 +58,41 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const res = await fetchWithRetry(
+        "/api/auth/login",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify({ email, password }),
         },
-        credentials: "include",
-        body: JSON.stringify({ email, password }),
-      });
+        {
+          retries: 3,
+          initialDelay: 800,
+          factor: 2,
+          maxDelay: 4000,
+          retryOnStatuses: [429, 502, 503, 504],
+        }
+      );
 
-      const data = await res.json();
-      alert(data.message);
-
-      if (res.ok) {
-        router.push("/admin/dashboard");
+      let data = {};
+      try {
+        data = await res.json();
+      } catch {
+        data = {};
       }
+
+      if (!res.ok) {
+        alert(data?.message || data?.error || `Login gagal (${res.status})`);
+        return;
+      }
+
+      alert(data?.message || "Login berhasil");
+      router.push("/admin/dashboard");
     } catch (error) {
-      console.error(error);
+      console.error("Login error:", error);
       alert("Terjadi error saat login");
     } finally {
       setLoading(false);
@@ -42,8 +102,6 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-200 via-white to-green-300 flex items-center justify-center px-4">
       <div className="w-full max-w-md backdrop-blur-xl bg-white/70 shadow-xl rounded-3xl p-8 border border-white/30">
-        
-        {/* Logo */}
         <div className="text-center mb-8">
           <div className="w-16 h-16 mx-auto rounded-2xl bg-green-600 text-white flex items-center justify-center text-2xl font-bold shadow-lg">
             K
@@ -59,8 +117,6 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleLogin} className="space-y-5">
-          
-          {/* Email */}
           <div>
             <label className="block mb-2 text-sm font-medium text-gray-700">
               Email
@@ -76,7 +132,6 @@ export default function LoginPage() {
             />
           </div>
 
-          {/* Password */}
           <div>
             <label className="block mb-2 text-sm font-medium text-gray-700">
               Password
@@ -98,7 +153,6 @@ export default function LoginPage() {
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-green-600 transition"
               >
                 {showPassword ? (
-                  // eye off
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     className="w-5 h-5"
@@ -116,11 +170,10 @@ export default function LoginPage() {
                     />
                   </svg>
                 ) : (
-                  // eye
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     className="w-5 h-5"
-                    fill="none" 
+                    fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
                   >
@@ -138,7 +191,6 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* Button */}
           <button
             type="submit"
             disabled={loading}
