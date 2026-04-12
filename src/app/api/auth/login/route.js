@@ -5,10 +5,15 @@ import bcrypt from "bcryptjs";
 
 export async function POST(req) {
   try {
-    const { email, password } = await req.json();
+    console.log("LOGIN: request received");
+
+    const body = await req.json();
+    const { email, password } = body;
 
     const cleanEmail = email?.trim();
     const cleanPassword = password?.trim();
+
+    console.log("LOGIN: parsed body", { email: cleanEmail });
 
     if (!cleanEmail || !cleanPassword) {
       return NextResponse.json(
@@ -18,11 +23,16 @@ export async function POST(req) {
     }
 
     const [rows] = await pool.query(
-      "SELECT * FROM admins WHERE email = ? LIMIT 1",
+      `SELECT id, email, name, password, failed_attempts, locked_until
+       FROM admins
+       WHERE email = ?
+       LIMIT 1`,
       [cleanEmail]
     );
 
-    if (rows.length === 0) {
+    console.log("LOGIN: query success, rows:", rows.length);
+
+    if (!rows || rows.length === 0) {
       return NextResponse.json(
         { message: "Email atau password salah" },
         { status: 401 }
@@ -39,10 +49,15 @@ export async function POST(req) {
       );
     }
 
+    if (!admin.password) {
+      throw new Error("Password admin kosong atau tidak ditemukan di database");
+    }
+
     const isMatch = await bcrypt.compare(cleanPassword, admin.password);
+    console.log("LOGIN: bcrypt compare:", isMatch);
 
     if (!isMatch) {
-      let failedAttempts = (admin.failed_attempts || 0) + 1;
+      let failedAttempts = Number(admin.failed_attempts || 0) + 1;
       let lockedUntil = null;
 
       if (failedAttempts >= 5) {
@@ -66,30 +81,48 @@ export async function POST(req) {
       [admin.id]
     );
 
+    if (!process.env.JWT_SECRET) {
+      throw new Error("JWT_SECRET belum diset di environment production");
+    }
+
     const token = createToken({
       id: admin.id,
       email: admin.email,
       name: admin.name,
     });
 
+    console.log("LOGIN: token created");
+
     const response = NextResponse.json(
-      { message: "Login berhasil" },
+      {
+        message: "Login berhasil",
+        user: {
+          id: admin.id,
+          email: admin.email,
+          name: admin.name,
+        },
+      },
       { status: 200 }
     );
 
     response.cookies.set("admin_token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      sameSite: "lax",
       path: "/",
       maxAge: 60 * 60 * 24,
     });
 
     return response;
   } catch (error) {
-    console.error("Login error:", error);
+    console.error("LOGIN ERROR FULL:", error);
+
     return NextResponse.json(
-      { message: "Terjadi kesalahan server" },
+      {
+        message: "Terjadi kesalahan server",
+        error: error.message,
+        code: error.code || null,
+      },
       { status: 500 }
     );
   }
