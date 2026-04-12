@@ -5,15 +5,14 @@ import bcrypt from "bcryptjs";
 
 export async function POST(req) {
   try {
-    console.log("LOGIN: request received");
+    console.log("LOGIN START");
 
-    const body = await req.json();
-    const { email, password } = body;
+    const { email, password } = await req.json();
 
     const cleanEmail = email?.trim();
     const cleanPassword = password?.trim();
 
-    console.log("LOGIN: parsed body", { email: cleanEmail });
+    console.log("EMAIL:", cleanEmail);
 
     if (!cleanEmail || !cleanPassword) {
       return NextResponse.json(
@@ -30,9 +29,9 @@ export async function POST(req) {
       [cleanEmail]
     );
 
-    console.log("LOGIN: query success, rows:", rows.length);
+    console.log("ROWS LENGTH:", rows.length);
 
-    if (!rows || rows.length === 0) {
+    if (rows.length === 0) {
       return NextResponse.json(
         { message: "Email atau password salah" },
         { status: 401 }
@@ -42,6 +41,12 @@ export async function POST(req) {
     const admin = rows[0];
     const now = new Date();
 
+    console.log("ADMIN FOUND:", {
+      id: admin.id,
+      email: admin.email,
+      hasPassword: !!admin.password,
+    });
+
     if (admin.locked_until && new Date(admin.locked_until) > now) {
       return NextResponse.json(
         { message: "Akun terkunci. Coba lagi 5 menit lagi." },
@@ -50,11 +55,11 @@ export async function POST(req) {
     }
 
     if (!admin.password) {
-      throw new Error("Password admin kosong atau tidak ditemukan di database");
+      throw new Error("Password admin kosong di database");
     }
 
     const isMatch = await bcrypt.compare(cleanPassword, admin.password);
-    console.log("LOGIN: bcrypt compare:", isMatch);
+    console.log("PASSWORD MATCH:", isMatch);
 
     if (!isMatch) {
       let failedAttempts = Number(admin.failed_attempts || 0) + 1;
@@ -81,17 +86,13 @@ export async function POST(req) {
       [admin.id]
     );
 
-    if (!process.env.JWT_SECRET) {
-      throw new Error("JWT_SECRET belum diset di environment production");
-    }
-
     const token = createToken({
       id: admin.id,
       email: admin.email,
       name: admin.name,
     });
 
-    console.log("LOGIN: token created");
+    console.log("TOKEN CREATED");
 
     const response = NextResponse.json(
       {
