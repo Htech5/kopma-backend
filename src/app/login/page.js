@@ -103,8 +103,15 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gradient-to-br from-green-200 via-white to-green-300 flex items-center justify-center px-4">
       <div className="w-full max-w-md backdrop-blur-xl bg-white/70 shadow-xl rounded-3xl p-8 border border-white/30">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 mx-auto rounded-2xl bg-green-600 text-white flex items-center justify-center text-2xl font-bold shadow-lg">
-            K
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-white flex items-center justify-center shadow-lg overflow-hidden">
+            <Image
+              src="/logokopma1.png"
+              alt="Logo Kopma"
+              width={64}
+              height={64}
+              className="object-contain p-2"
+              priority
+            />
           </div>
 
           <h1 className="text-3xl font-bold text-gray-800 mt-4">
