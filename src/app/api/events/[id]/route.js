@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import slugify from "@/lib/slug";
+import { requireAuth } from "@/lib/auth";
 
 export async function GET(_, context) {
   try {
@@ -30,6 +31,10 @@ export async function GET(_, context) {
 
 export async function PUT(request, context) {
   try {
+    if (!(await requireAuth())) {
+      return NextResponse.json({ message: "Tidak diautentikasi" }, { status: 401 });
+    }
+
     const { id } = await context.params;
     const body = await request.json();
 
@@ -109,6 +114,10 @@ export async function PUT(request, context) {
 
 export async function DELETE(_, context) {
   try {
+    if (!(await requireAuth())) {
+      return NextResponse.json({ message: "Tidak diautentikasi" }, { status: 401 });
+    }
+
     const { id } = await context.params;
 
     const [result] = await db.query("DELETE FROM events WHERE id = ?", [id]);

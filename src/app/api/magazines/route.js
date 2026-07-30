@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import pool from "@/lib/db";
 import fs from "fs";
 import path from "path";
+import { requireAuth } from "@/lib/auth";
 
 export async function GET() {
   try {
@@ -21,6 +22,10 @@ export async function GET() {
 
 export async function POST(req) {
   try {
+    if (!(await requireAuth())) {
+      return NextResponse.json({ message: "Tidak diautentikasi" }, { status: 401 });
+    }
+
     const formData = await req.formData();
 
     const title = formData.get("title");

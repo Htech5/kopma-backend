@@ -3,6 +3,7 @@ import db from "@/lib/db";
 import fs from "fs/promises";
 import path from "path";
 import { saveInventarisImage } from "@/lib/uploadInventaris";
+import { requireAuth } from "@/lib/auth";
 
 async function removeOldImage(imagePath) {
   if (!imagePath) return;
@@ -58,10 +59,7 @@ export async function GET(_, context) {
   } catch (error) {
     console.error("GET detail inventaris error:", error);
     return NextResponse.json(
-      {
-        message: "Gagal mengambil detail inventaris",
-        detail: error?.message || "Unknown error",
-      },
+      { message: "Gagal mengambil detail inventaris" },
       { status: 500 }
     );
   }
@@ -69,6 +67,10 @@ export async function GET(_, context) {
 
 export async function PUT(request, context) {
   try {
+    if (!(await requireAuth())) {
+      return NextResponse.json({ message: "Tidak diautentikasi" }, { status: 401 });
+    }
+
     const { id } = await context.params;
 
     const [existingRows] = await db.query(
@@ -126,10 +128,7 @@ export async function PUT(request, context) {
   } catch (error) {
     console.error("PUT inventaris error:", error);
     return NextResponse.json(
-      {
-        message: "Gagal memperbarui inventaris",
-        detail: error?.message || "Unknown error",
-      },
+      { message: "Gagal memperbarui inventaris" },
       { status: 500 }
     );
   }
@@ -137,6 +136,10 @@ export async function PUT(request, context) {
 
 export async function DELETE(_, context) {
   try {
+    if (!(await requireAuth())) {
+      return NextResponse.json({ message: "Tidak diautentikasi" }, { status: 401 });
+    }
+
     const { id } = await context.params;
 
     const [rows] = await db.query(
@@ -165,10 +168,7 @@ export async function DELETE(_, context) {
   } catch (error) {
     console.error("DELETE inventaris error:", error);
     return NextResponse.json(
-      {
-        message: "Gagal menghapus inventaris",
-        detail: error?.message || "Unknown error",
-      },
+      { message: "Gagal menghapus inventaris" },
       { status: 500 }
     );
   }

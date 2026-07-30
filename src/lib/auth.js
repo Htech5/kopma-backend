@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import { cookies } from "next/headers";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -17,4 +18,10 @@ export function verifyToken(token) {
   } catch {
     return null;
   }
+}
+
+// Gerbang auth untuk route API. Return payload admin bila token valid, null bila tidak.
+export async function requireAuth() {
+  const token = (await cookies()).get("admin_token")?.value;
+  return token ? verifyToken(token) : null;
 }

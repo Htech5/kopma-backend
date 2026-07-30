@@ -1,34 +1,40 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import slugify from "@/lib/slug";
+import { requireAuth } from "@/lib/auth";
 
-export async function GET() {
+export async function GET(request) {
   try {
-    const [rows] = await db.query(`
-      SELECT 
-        events.*,
-        categories.name AS category_name
-      FROM events
-      LEFT JOIN categories ON events.category_id = categories.id
-      ORDER BY events.created_at DESC
-    `);
+    const { searchParams } = new URL(request.url);
+    // Cap + offset agar paging dikerjakan MySQL, bukan menarik seluruh tabel.
+    const limit = Math.min(100, Math.max(1, Number(searchParams.get("limit")) || 100));
+    const offset = Math.max(0, Number(searchParams.get("offset")) || 0);
+
+    const [rows] = await db.query(
+      `SELECT events.*, categories.name AS category_name
+       FROM events
+       LEFT JOIN categories ON events.category_id = categories.id
+       ORDER BY events.created_at DESC
+       LIMIT ? OFFSET ?`,
+      [limit, offset]
+    );
 
     return NextResponse.json(rows);
   } catch (error) {
-  console.error("POST events error:", error);
-  return NextResponse.json(
-    {
-      message: "Gagal menambahkan event",
-      error: error.message,
-      detail: error.sqlMessage || null,
-    },
-    { status: 500 }
-  );
-}
+    console.error("GET events error:", error);
+    return NextResponse.json(
+      { message: "Gagal mengambil data event" },
+      { status: 500 }
+    );
+  }
 }
 
 export async function POST(request) {
   try {
+    if (!(await requireAuth())) {
+      return NextResponse.json({ message: "Tidak diautentikasi" }, { status: 401 });
+    }
+
     const body = await request.json();
     const {
       title,

@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
+import { requireAuth } from "@/lib/auth";
 
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const contentType = searchParams.get("content_type");
     const contentId = searchParams.get("content_id");
-    const status = searchParams.get("status");
+    // Publik (tanpa auth) hanya boleh melihat komentar approved.
+    // Admin (cookie valid) boleh memfilter status apa pun / semua.
+    const authed = await requireAuth();
+    const status = authed ? searchParams.get("status") : "approved";
 
     let query = `
       SELECT id, name, email, content_type, content_id, comment, status, created_at
@@ -44,7 +48,6 @@ export async function GET(request) {
     return NextResponse.json(
       {
         message: "Gagal mengambil data komentar",
-        detail: error?.message || "Unknown error",
       },
       { status: 500 }
     );
@@ -99,7 +102,6 @@ export async function POST(request) {
     return NextResponse.json(
       {
         message: "Gagal mengirim komentar",
-        detail: error?.message || "Unknown error",
       },
       { status: 500 }
     );

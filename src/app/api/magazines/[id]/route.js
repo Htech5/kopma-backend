@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import pool from "@/lib/db";
 import fs from "fs";
 import path from "path";
+import { requireAuth } from "@/lib/auth";
 
 export async function GET(req, { params }) {
   try {
@@ -31,6 +32,10 @@ export async function GET(req, { params }) {
 
 export async function PUT(req, { params }) {
   try {
+    if (!(await requireAuth())) {
+      return NextResponse.json({ message: "Tidak diautentikasi" }, { status: 401 });
+    }
+
     const { id } = await params;
     const formData = await req.formData();
 
@@ -110,6 +115,10 @@ export async function PUT(req, { params }) {
 
 export async function DELETE(req, { params }) {
   try {
+    if (!(await requireAuth())) {
+      return NextResponse.json({ message: "Tidak diautentikasi" }, { status: 401 });
+    }
+
     const { id } = await params;
 
     await pool.query("DELETE FROM magazines WHERE id = ?", [id]);

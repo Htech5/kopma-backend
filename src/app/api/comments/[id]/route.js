@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
+import { requireAuth } from "@/lib/auth";
 
 export async function GET(_, context) {
   try {
@@ -23,7 +24,6 @@ export async function GET(_, context) {
     return NextResponse.json(
       {
         message: "Gagal mengambil detail komentar",
-        detail: error?.message || "Unknown error",
       },
       { status: 500 }
     );
@@ -32,6 +32,10 @@ export async function GET(_, context) {
 
 export async function DELETE(_, context) {
   try {
+    if (!(await requireAuth())) {
+      return NextResponse.json({ message: "Tidak diautentikasi" }, { status: 401 });
+    }
+
     const { id } = await context.params;
 
     const [result] = await db.query("DELETE FROM comments WHERE id = ?", [id]);
@@ -51,7 +55,6 @@ export async function DELETE(_, context) {
     return NextResponse.json(
       {
         message: "Gagal menghapus komentar",
-        detail: error?.message || "Unknown error",
       },
       { status: 500 }
     );

@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
+import { requireAuth } from "@/lib/auth";
 
 export async function PATCH(request) {
   try {
+    if (!(await requireAuth())) {
+      return NextResponse.json({ message: "Tidak diautentikasi" }, { status: 401 });
+    }
+
     const body = await request.json();
     const { id } = body;
 
@@ -33,7 +38,6 @@ export async function PATCH(request) {
     return NextResponse.json(
       {
         message: "Gagal approve komentar",
-        detail: error?.message || "Unknown error",
       },
       { status: 500 }
     );

@@ -1,22 +1,21 @@
 import { NextResponse } from "next/server";
 import { mkdir, writeFile } from "fs/promises";
 import path from "path";
+import { requireAuth } from "@/lib/auth";
+import { sniffImageExt, MAX_IMAGE_BYTES } from "@/lib/uploadInventaris";
 
 export async function POST(request) {
   try {
+    if (!(await requireAuth())) {
+      return NextResponse.json({ message: "Tidak diautentikasi" }, { status: 401 });
+    }
+
     const formData = await request.formData();
     const file = formData.get("file");
 
-    if (!file) {
+    if (!file || typeof file === "string") {
       return NextResponse.json(
         { message: "File tidak ditemukan" },
-        { status: 400 }
-      );
-    }
-
-    if (!file.type.startsWith("image/")) {
-      return NextResponse.json(
-        { message: "File harus berupa gambar" },
         { status: 400 }
       );
     }
@@ -24,10 +23,25 @@ export async function POST(request) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
+    if (buffer.length > MAX_IMAGE_BYTES) {
+      return NextResponse.json(
+        { message: "Ukuran file maksimal 5MB" },
+        { status: 400 }
+      );
+    }
+
+    // Validasi magic byte, bukan MIME/ekstensi dari client (tolak SVG dll).
+    const ext = sniffImageExt(buffer);
+    if (!ext) {
+      return NextResponse.json(
+        { message: "File harus berupa gambar JPEG, PNG, atau WebP" },
+        { status: 400 }
+      );
+    }
+
     const uploadDir = path.join(process.cwd(), "public/uploads/events");
     await mkdir(uploadDir, { recursive: true });
 
-    const ext = file.name.split(".").pop();
     const filename = `${Date.now()}-${Math.random()
       .toString(36)
       .slice(2)}.${ext}`;

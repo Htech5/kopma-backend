@@ -119,11 +119,7 @@ export async function POST(req) {
     console.error("LOGIN ERROR FULL:", error);
 
     return NextResponse.json(
-      {
-        message: "Terjadi kesalahan server",
-        error: error.message,
-        code: error.code || null,
-      },
+      { message: "Terjadi kesalahan server" },
       { status: 500 }
     );
   }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { saveInventarisImage } from "@/lib/uploadInventaris";
+import { requireAuth } from "@/lib/auth";
 
 function buildImageUrl(apiBase, imagePath) {
   if (!imagePath || typeof imagePath !== "string") return null;
@@ -47,7 +48,8 @@ export async function GET(request) {
       values.push(`%${keyword}%`);
     }
 
-    query += ` ORDER BY created_at DESC`;
+    // Cap hasil agar query tak pernah dump seluruh tabel tanpa batas.
+    query += ` ORDER BY created_at DESC LIMIT 500`;
 
     const [rows] = await db.query(query, values);
 
@@ -55,10 +57,7 @@ export async function GET(request) {
   } catch (error) {
     console.error("GET inventaris error:", error);
     return NextResponse.json(
-      {
-        message: "Gagal mengambil data inventaris",
-        detail: error?.message || "Unknown error",
-      },
+      { message: "Gagal mengambil data inventaris" },
       { status: 500 }
     );
   }
@@ -66,6 +65,10 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
+    if (!(await requireAuth())) {
+      return NextResponse.json({ message: "Tidak diautentikasi" }, { status: 401 });
+    }
+
     const formData = await request.formData();
 
     const nama = String(formData.get("nama") || "").trim();
@@ -105,10 +108,7 @@ export async function POST(request) {
   } catch (error) {
     console.error("POST inventaris error:", error);
     return NextResponse.json(
-      {
-        message: "Gagal menambahkan inventaris",
-        detail: error?.message || "Unknown error",
-      },
+      { message: "Gagal menambahkan inventaris" },
       { status: 500 }
     );
   }
