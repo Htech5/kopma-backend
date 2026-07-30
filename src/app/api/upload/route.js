@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
-import { mkdir, writeFile } from "fs/promises";
-import path from "path";
 import { requireAuth } from "@/lib/auth";
-import { sniffImageExt, MAX_IMAGE_BYTES } from "@/lib/uploadInventaris";
+import { putImage } from "@/lib/uploadInventaris";
 
 export async function POST(request) {
   try {
@@ -20,45 +18,18 @@ export async function POST(request) {
       );
     }
 
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
+    // putImage: validasi magic byte + ukuran (5MB), simpan ke Vercel Blob.
+    const filePath = await putImage(file, "events");
 
-    if (buffer.length > MAX_IMAGE_BYTES) {
-      return NextResponse.json(
-        { message: "Ukuran file maksimal 5MB" },
-        { status: 400 }
-      );
-    }
-
-    // Validasi magic byte, bukan MIME/ekstensi dari client (tolak SVG dll).
-    const ext = sniffImageExt(buffer);
-    if (!ext) {
-      return NextResponse.json(
-        { message: "File harus berupa gambar JPEG, PNG, atau WebP" },
-        { status: 400 }
-      );
-    }
-
-    const uploadDir = path.join(process.cwd(), "public/uploads/events");
-    await mkdir(uploadDir, { recursive: true });
-
-    const filename = `${Date.now()}-${Math.random()
-      .toString(36)
-      .slice(2)}.${ext}`;
-
-    const filepath = path.join(uploadDir, filename);
-
-    await writeFile(filepath, buffer);
-
-    return NextResponse.json({
-      message: "Upload berhasil",
-      filePath: `/uploads/events/${filename}`,
-    });
+    return NextResponse.json({ message: "Upload berhasil", filePath });
   } catch (error) {
+    if (String(error?.message).startsWith("INVALID_UPLOAD:")) {
+      return NextResponse.json(
+        { message: error.message.replace("INVALID_UPLOAD: ", "") },
+        { status: 400 }
+      );
+    }
     console.error("UPLOAD ERROR:", error);
-    return NextResponse.json(
-      { message: "Gagal upload file" },
-      { status: 500 }
-    );
+    return NextResponse.json({ message: "Gagal upload file" }, { status: 500 });
   }
 }

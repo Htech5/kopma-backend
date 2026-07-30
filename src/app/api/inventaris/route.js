@@ -106,6 +106,12 @@ export async function POST(request) {
       { status: 201 }
     );
   } catch (error) {
+    if (String(error?.message).startsWith("INVALID_UPLOAD:")) {
+      return NextResponse.json(
+        { message: error.message.replace("INVALID_UPLOAD: ", "") },
+        { status: 400 }
+      );
+    }
     console.error("POST inventaris error:", error);
     return NextResponse.json(
       { message: "Gagal menambahkan inventaris" },

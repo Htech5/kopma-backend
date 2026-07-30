@@ -24,6 +24,9 @@
 .DS_Store
 *.pem
 
+# user uploads (data runtime, jangan ikut deploy — simpan persisten di server)
+/public/uploads/
+
 # debug
 npm-debug.log*
 yarn-debug.log*

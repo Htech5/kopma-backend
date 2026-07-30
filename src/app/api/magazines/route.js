@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
-import fs from "fs";
-import path from "path";
 import { requireAuth } from "@/lib/auth";
+import { putPdf } from "@/lib/uploadInventaris";
 
 export async function GET() {
   try {
@@ -32,44 +31,15 @@ export async function POST(req) {
     const year = formData.get("year");
     const file = formData.get("file");
 
-    if (!title || !year || !file) {
+    if (!title || !year || !file || typeof file === "string") {
       return NextResponse.json(
         { message: "Judul, tahun, dan file wajib diisi" },
         { status: 400 }
       );
     }
 
-    if (file.type !== "application/pdf") {
-      return NextResponse.json(
-        { message: "File harus berupa PDF" },
-        { status: 400 }
-      );
-    }
-
-    const maxSizeBytes = 50 * 1024 * 1024;
-
-    if (file.size > maxSizeBytes) {
-      return NextResponse.json(
-        { message: "Ukuran file maksimal 50 MB" },
-        { status: 400 }
-      );
-    }
-
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-
-    const uploadDir = path.join(process.cwd(), "public/uploads/magazines");
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-
-    const safeFileName = file.name.replace(/\s+/g, "-");
-    const fileName = `${Date.now()}-${safeFileName}`;
-    const filePath = path.join(uploadDir, fileName);
-
-    fs.writeFileSync(filePath, buffer);
-
-    const pdfFile = `/uploads/magazines/${fileName}`;
+    // putPdf: validasi magic byte + ukuran (50MB), simpan ke Vercel Blob.
+    const pdfFile = await putPdf(file, "magazines");
 
     await pool.query(
       "INSERT INTO magazines (title, year, pdf_file) VALUES (?, ?, ?)",
@@ -81,6 +51,12 @@ export async function POST(req) {
       { status: 201 }
     );
   } catch (error) {
+    if (String(error?.message).startsWith("INVALID_UPLOAD:")) {
+      return NextResponse.json(
+        { message: error.message.replace("INVALID_UPLOAD: ", "") },
+        { status: 400 }
+      );
+    }
     console.error("POST magazines error:", error);
     return NextResponse.json(
       { message: "Gagal menambahkan magazine" },

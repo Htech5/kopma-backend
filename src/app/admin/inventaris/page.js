@@ -95,6 +95,19 @@ export default function AdminInventarisPage() {
   function handleFileChange(e) {
     const file = e.target.files?.[0] || null;
 
+    if (file) {
+      if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+        alert("File harus berupa gambar JPEG, PNG, atau WebP");
+        e.target.value = "";
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        alert("Ukuran gambar maksimal 5 MB");
+        e.target.value = "";
+        return;
+      }
+    }
+
     setForm((prev) => ({
       ...prev,
       gambar: file,

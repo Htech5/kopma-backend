@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
-import fs from "fs";
-import path from "path";
 import { requireAuth } from "@/lib/auth";
+import { putPdf, deleteBlob } from "@/lib/uploadInventaris";
 
 export async function GET(req, { params }) {
   try {
@@ -64,38 +63,10 @@ export async function PUT(req, { params }) {
 
     let pdfFile = rows[0].pdf_file;
 
-    if (file && file.size > 0) {
-      if (file.type !== "application/pdf") {
-        return NextResponse.json(
-          { message: "File harus berupa PDF" },
-          { status: 400 }
-        );
-      }
-
-      const maxSizeBytes = 50 * 1024 * 1024;
-
-      if (file.size > maxSizeBytes) {
-        return NextResponse.json(
-          { message: "Ukuran file maksimal 50 MB" },
-          { status: 400 }
-        );
-      }
-
-      const bytes = await file.arrayBuffer();
-      const buffer = Buffer.from(bytes);
-
-      const uploadDir = path.join(process.cwd(), "public/uploads/magazines");
-      if (!fs.existsSync(uploadDir)) {
-        fs.mkdirSync(uploadDir, { recursive: true });
-      }
-
-      const safeFileName = file.name.replace(/\s+/g, "-");
-      const fileName = `${Date.now()}-${safeFileName}`;
-      const filePath = path.join(uploadDir, fileName);
-
-      fs.writeFileSync(filePath, buffer);
-
-      pdfFile = `/uploads/magazines/${fileName}`;
+    if (file && typeof file !== "string" && file.size > 0) {
+      const oldPdf = pdfFile;
+      pdfFile = await putPdf(file, "magazines"); // validasi + simpan ke Blob
+      await deleteBlob(oldPdf); // hapus PDF lama (aman bila path lokal lama)
     }
 
     await pool.query(
@@ -105,6 +76,12 @@ export async function PUT(req, { params }) {
 
     return NextResponse.json({ message: "Magazine berhasil diupdate" });
   } catch (error) {
+    if (String(error?.message).startsWith("INVALID_UPLOAD:")) {
+      return NextResponse.json(
+        { message: error.message.replace("INVALID_UPLOAD: ", "") },
+        { status: 400 }
+      );
+    }
     console.error("PUT magazine error:", error);
     return NextResponse.json(
       { message: "Gagal mengupdate magazine" },
@@ -121,7 +98,14 @@ export async function DELETE(req, { params }) {
 
     const { id } = await params;
 
+    const [rows] = await pool.query(
+      "SELECT pdf_file FROM magazines WHERE id = ?",
+      [id]
+    );
+
     await pool.query("DELETE FROM magazines WHERE id = ?", [id]);
+
+    if (rows[0]?.pdf_file) await deleteBlob(rows[0].pdf_file);
 
     return NextResponse.json({ message: "Magazine berhasil dihapus" });
   } catch (error) {

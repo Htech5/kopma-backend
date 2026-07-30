@@ -44,6 +44,13 @@ export default function CreateEventPage() {
   }, [categories, categoryId]);
 
   async function uploadImage(file, type) {
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      throw new Error("File harus gambar JPEG, PNG, atau WebP");
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      throw new Error("Ukuran gambar maksimal 5 MB");
+    }
+
     const formData = new FormData();
     formData.append("file", file);
 

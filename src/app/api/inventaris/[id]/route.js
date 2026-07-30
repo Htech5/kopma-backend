@@ -1,22 +1,7 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import fs from "fs/promises";
-import path from "path";
-import { saveInventarisImage } from "@/lib/uploadInventaris";
+import { saveInventarisImage, deleteBlob } from "@/lib/uploadInventaris";
 import { requireAuth } from "@/lib/auth";
-
-async function removeOldImage(imagePath) {
-  if (!imagePath) return;
-  if (!imagePath.startsWith("/uploads/inventaris/")) return;
-
-  const absolutePath = path.join(process.cwd(), "public", imagePath);
-
-  try {
-    await fs.unlink(absolutePath);
-  } catch {
-    // ignore
-  }
-}
 
 export async function GET(_, context) {
   try {
@@ -101,14 +86,14 @@ export async function PUT(request, context) {
     let gambarPath = existing.gambar;
 
     if (hapusGambar) {
-      await removeOldImage(existing.gambar);
+      await deleteBlob(existing.gambar);
       gambarPath = null;
     }
 
     if (gambarFile && typeof gambarFile === "object" && gambarFile.size > 0) {
       const newImagePath = await saveInventarisImage(gambarFile);
       if (existing.gambar) {
-        await removeOldImage(existing.gambar);
+        await deleteBlob(existing.gambar);
       }
       gambarPath = newImagePath;
     }
@@ -126,6 +111,12 @@ export async function PUT(request, context) {
       message: "Inventaris berhasil diperbarui",
     });
   } catch (error) {
+    if (String(error?.message).startsWith("INVALID_UPLOAD:")) {
+      return NextResponse.json(
+        { message: error.message.replace("INVALID_UPLOAD: ", "") },
+        { status: 400 }
+      );
+    }
     console.error("PUT inventaris error:", error);
     return NextResponse.json(
       { message: "Gagal memperbarui inventaris" },
@@ -159,7 +150,7 @@ export async function DELETE(_, context) {
     await db.query(`DELETE FROM inventaris WHERE id = ?`, [id]);
 
     if (oldImage) {
-      await removeOldImage(oldImage);
+      await deleteBlob(oldImage);
     }
 
     return NextResponse.json({
