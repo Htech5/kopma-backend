@@ -1,8 +1,6 @@
+import { redirect } from "next/navigation";
+
 export default function HomePage() {
-  return (
-    <main style={{ padding: "40px", fontFamily: "Arial" }}>
-      <h1>App hidup</h1>
-      <p>Kalau halaman ini tampil, berarti Next.js berhasil diakses dari domain, silahkan akses ke api.ukmkopmaunnes.com/login </p>
-    </main>
-  );
+  // Root langsung ke login; middleware yang lempar ke dashboard kalau sudah punya token.
+  redirect("/login");
 }
