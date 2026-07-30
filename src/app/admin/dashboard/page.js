@@ -1,12 +1,4 @@
 import Link from "next/link";
-import {
-  BookOpen,
-  CalendarDays,
-  FolderKanban,
-  Package,
-  MessageSquare,
-  ArrowUpRight,
-} from "lucide-react";
 import db from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -25,31 +17,17 @@ async function getDashboardData() {
   return rows[0];
 }
 
-function StatCard({ label, value, icon: Icon, href, accent = false }) {
-  return (
-    <Link
-      href={href}
-      className="group rounded-xl border border-slate-200 bg-white p-5 transition hover:border-slate-300 hover:shadow-sm"
-    >
-      <div className="flex items-start justify-between">
-        <span className="text-sm text-slate-500">{label}</span>
-        <Icon
-          className={`h-4 w-4 ${accent ? "text-amber-500" : "text-slate-400"}`}
-        />
-      </div>
-      <p
-        className={`tabular mt-3 text-3xl font-semibold tracking-tight ${
-          accent && value > 0 ? "text-amber-600" : "text-slate-900"
-        }`}
-      >
-        {value}
-      </p>
-      <span className="mt-3 inline-flex items-center gap-1 text-xs text-slate-400 transition group-hover:text-emerald-700">
-        Kelola <ArrowUpRight className="h-3 w-3" />
-      </span>
-    </Link>
-  );
-}
+const STATS = [
+  { key: "magazines", label: "Magazine", href: "/admin/magazines" },
+  { key: "events", label: "Events", href: "/admin/events" },
+  { key: "categories", label: "Kategori", href: "/admin/categories" },
+  { key: "inventaris", label: "Inventaris", href: "/admin/inventaris" },
+  {
+    key: "pending_comments",
+    label: "Komentar pending",
+    href: "/admin/comments",
+  },
+];
 
 export default async function DashboardPage() {
   const data = await getDashboardData();
@@ -61,91 +39,48 @@ export default async function DashboardPage() {
   });
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8">
-      <header className="flex flex-wrap items-end justify-between gap-3">
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-3 rounded-2xl border border-green-100 bg-white p-6 shadow-sm">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
-            Ringkasan
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Status konten dan operasional KOPMA UNNES.
+          <h1 className="text-2xl font-bold text-green-700">Dashboard Admin</h1>
+          <p className="mt-1 text-sm text-gray-600">
+            Ringkasan data konten dan operasional Kopma.
           </p>
         </div>
-        <p className="text-xs text-slate-400">Diperbarui {updatedAt} WIB</p>
-      </header>
+        <p className="text-xs text-gray-500">Data per {updatedAt} WIB</p>
+      </div>
 
-      <section className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-        <StatCard
-          label="Magazine"
-          value={data.magazines}
-          icon={BookOpen}
-          href="/admin/magazines"
-        />
-        <StatCard
-          label="Events"
-          value={data.events}
-          icon={CalendarDays}
-          href="/admin/events"
-        />
-        <StatCard
-          label="Kategori"
-          value={data.categories}
-          icon={FolderKanban}
-          href="/admin/categories"
-        />
-        <StatCard
-          label="Inventaris"
-          value={data.inventaris}
-          icon={Package}
-          href="/admin/inventaris"
-        />
-        <StatCard
-          label="Komentar pending"
-          value={data.pending_comments}
-          icon={MessageSquare}
-          href="/admin/comments"
-          accent
-        />
-      </section>
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+        {STATS.map((stat) => (
+          <Link
+            key={stat.key}
+            href={stat.href}
+            className="rounded-2xl border border-green-100 border-l-4 border-l-green-600 bg-white p-5 shadow-sm transition hover:shadow-md"
+          >
+            <p className="text-sm text-gray-500">{stat.label}</p>
+            <p className="tabular mt-2 text-3xl font-bold text-green-700">
+              {data[stat.key]}
+            </p>
+          </Link>
+        ))}
+      </div>
 
       {data.pending_comments > 0 && (
-        <section className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-amber-200 bg-amber-50 p-5">
-          <div>
-            <p className="text-sm font-medium text-amber-900">
-              {data.pending_comments} komentar menunggu moderasi
-            </p>
-            <p className="mt-1 text-sm text-amber-800/80">
-              Komentar baru belum tampil di situs sampai disetujui.
-            </p>
-          </div>
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-yellow-200 bg-yellow-50 p-5">
+          <p className="text-sm text-yellow-900">
+            <span className="font-semibold">
+              {data.pending_comments} komentar
+            </span>{" "}
+            menunggu moderasi dan belum tampil di situs.
+          </p>
           <Link
             href="/admin/comments"
-            className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-amber-700"
+            className="rounded-lg bg-yellow-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-yellow-700"
           >
-            Moderasi sekarang
+            Moderasi
           </Link>
-        </section>
-      )}
-
-      <section>
-        <h2 className="text-sm font-medium text-slate-900">Aksi cepat</h2>
-        <div className="mt-3 grid gap-3 sm:grid-cols-3">
-          {[
-            { label: "Tambah event", href: "/admin/events/create" },
-            { label: "Tambah magazine", href: "/admin/magazines/create" },
-            { label: "Tambah kategori", href: "/admin/categories/create" },
-          ].map((action) => (
-            <Link
-              key={action.href}
-              href={action.href}
-              className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 transition hover:border-emerald-600 hover:text-emerald-700"
-            >
-              {action.label}
-              <ArrowUpRight className="h-4 w-4" />
-            </Link>
-          ))}
         </div>
-      </section>
+      )}
     </div>
   );
 }
