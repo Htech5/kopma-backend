@@ -3,12 +3,12 @@ import { cookies } from "next/headers";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
-export function createToken(payload) {
+export function createToken(payload, expiresIn = "1d") {
   if (!JWT_SECRET) {
     throw new Error("JWT_SECRET tidak ditemukan");
   }
 
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: "1d" });
+  return jwt.sign(payload, JWT_SECRET, { expiresIn });
 }
 
 export function verifyToken(token) {

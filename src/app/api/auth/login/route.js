@@ -7,7 +7,7 @@ export async function POST(req) {
   try {
     console.log("LOGIN START");
 
-    const { email, password } = await req.json();
+    const { email, password, remember, turnstileToken } = await req.json();
 
     const cleanEmail = email?.trim();
     const cleanPassword = password?.trim();
@@ -19,6 +19,29 @@ export async function POST(req) {
         { message: "Email dan password wajib diisi" },
         { status: 400 }
       );
+    }
+
+    // Turnstile aktif hanya kalau secret-nya diset (dev lokal boleh tanpa).
+    if (process.env.TURNSTILE_SECRET_KEY) {
+      const verify = await fetch(
+        "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            secret: process.env.TURNSTILE_SECRET_KEY,
+            response: turnstileToken || "",
+            remoteip: req.headers.get("x-forwarded-for")?.split(",")[0] || "",
+          }),
+        }
+      ).then((r) => r.json());
+
+      if (!verify.success) {
+        return NextResponse.json(
+          { message: "Verifikasi keamanan gagal. Coba lagi." },
+          { status: 400 }
+        );
+      }
     }
 
     const [rows] = await pool.query(
@@ -86,11 +109,15 @@ export async function POST(req) {
       [admin.id]
     );
 
-    const token = createToken({
-      id: admin.id,
-      email: admin.email,
-      name: admin.name,
-    });
+    const maxAge = remember ? 60 * 60 * 24 * 30 : 60 * 60 * 24;
+    const token = createToken(
+      {
+        id: admin.id,
+        email: admin.email,
+        name: admin.name,
+      },
+      remember ? "30d" : "1d"
+    );
 
     console.log("TOKEN CREATED");
 
@@ -111,7 +138,7 @@ export async function POST(req) {
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      maxAge: 60 * 60 * 24,
+      maxAge,
     });
 
     return response;
