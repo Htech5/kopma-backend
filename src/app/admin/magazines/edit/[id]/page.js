@@ -3,11 +3,14 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
+import { ArrowLeft, FileUp, Eye } from "lucide-react";
+import { useAdminFeedback } from "../../../_components/AdminUI";
 
 export default function EditMagazinePage() {
   const router = useRouter();
   const params = useParams();
   const id = params?.id;
+  const { notify, feedbackUI } = useAdminFeedback();
 
   const [title, setTitle] = useState("");
   const [year, setYear] = useState("");
@@ -35,7 +38,7 @@ export default function EditMagazinePage() {
         }
 
         if (!res.ok) {
-          alert(data.message || "Gagal mengambil data magazine");
+          notify(data.message || "Gagal mengambil data magazine", "error");
           return;
         }
 
@@ -44,7 +47,7 @@ export default function EditMagazinePage() {
         setCurrentPdfFile(data.pdf_file || "");
       } catch (error) {
         console.error("Gagal mengambil detail magazine:", error);
-        alert("Terjadi kesalahan saat mengambil data");
+        notify("Terjadi kesalahan saat mengambil data", "error");
       } finally {
         setFetching(false);
       }
@@ -74,7 +77,7 @@ export default function EditMagazinePage() {
     if (!selectedFile) return;
 
     if (selectedFile.type !== "application/pdf") {
-      alert("File harus berupa PDF");
+      notify("File harus berupa PDF", "error");
       return;
     }
 
@@ -82,7 +85,7 @@ export default function EditMagazinePage() {
     const sizeMb = selectedFile.size / (1024 * 1024);
 
     if (sizeMb > maxSizeMb) {
-      alert(`Ukuran file maksimal ${maxSizeMb} MB`);
+      notify(`Ukuran file maksimal ${maxSizeMb} MB`, "error");
       return;
     }
 
@@ -98,7 +101,7 @@ export default function EditMagazinePage() {
     e.preventDefault();
 
     if (!title.trim() || !year) {
-      alert("Judul dan tahun wajib diisi");
+      notify("Judul dan tahun wajib diisi", "error");
       return;
     }
 
@@ -121,15 +124,15 @@ export default function EditMagazinePage() {
       const data = await res.json();
 
       if (!res.ok) {
-        alert(data.message || "Gagal mengupdate magazine");
+        notify(data.message || "Gagal mengupdate magazine", "error");
         return;
       }
 
-      alert(data.message || "Magazine berhasil diupdate");
+      notify(data.message || "Magazine berhasil diupdate");
       router.push("/admin/magazines");
     } catch (error) {
       console.error("Gagal update magazine:", error);
-      alert("Terjadi kesalahan");
+      notify("Terjadi kesalahan", "error");
     } finally {
       setLoading(false);
     }
@@ -160,7 +163,7 @@ export default function EditMagazinePage() {
 
         <Link
           href="/admin/magazines"
-          className="mt-5 inline-flex h-11 items-center justify-center rounded-xl bg-green-700 px-5 text-sm font-semibold text-white hover:bg-green-800"
+          className="mt-5 inline-flex h-11 items-center justify-center rounded-xl bg-green-700 px-5 text-sm font-semibold text-white transition hover:bg-green-800"
         >
           Kembali ke Magazine
         </Link>
@@ -170,6 +173,8 @@ export default function EditMagazinePage() {
 
   return (
     <div className="space-y-6">
+      {feedbackUI}
+
       <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-5 md:p-7">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
@@ -186,9 +191,10 @@ export default function EditMagazinePage() {
 
           <Link
             href="/admin/magazines"
-            className="inline-flex h-11 items-center justify-center rounded-xl border border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-gray-300 px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
           >
-            ← Kembali
+            <ArrowLeft className="h-4 w-4" />
+            Kembali
           </Link>
         </div>
       </div>
@@ -242,7 +248,7 @@ export default function EditMagazinePage() {
               </label>
 
               <label className="flex min-h-[160px] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-green-300 bg-green-50 px-5 py-6 text-center transition hover:bg-green-100">
-                <span className="mb-3 text-4xl">📄</span>
+                <FileUp className="mb-3 h-9 w-9 text-green-600" />
                 <span className="text-base md:text-lg font-semibold text-green-700">
                   Klik untuk pilih file PDF baru
                 </span>
@@ -300,7 +306,7 @@ export default function EditMagazinePage() {
           {!activePreview ? (
             <div className="mt-5 flex min-h-[320px] md:min-h-[500px] items-center justify-center rounded-2xl border-2 border-dashed border-gray-200 px-6 text-center">
               <div>
-                <div className="mb-3 text-5xl">👀</div>
+                <Eye className="mx-auto mb-3 h-10 w-10 text-gray-300" />
                 <p className="text-lg font-semibold text-gray-700">Belum ada preview</p>
                 <p className="mt-1 text-sm text-gray-500">
                   File PDF saat ini atau file baru akan tampil di sini.

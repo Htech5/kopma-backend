@@ -2,18 +2,26 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { BookOpen, FileText, Pencil, Trash2 } from "lucide-react";
+import { LoadingBlock, useAdminFeedback } from "../_components/AdminUI";
 
 export default function MagazinesPage() {
   const [magazines, setMagazines] = useState([]);
   const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+  const { notify, askConfirm, closeConfirm, feedbackUI } = useAdminFeedback();
 
   const fetchMagazines = async () => {
     try {
+      setLoading(true);
       const res = await fetch("/api/magazines");
       const data = await res.json();
       setMagazines(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Gagal mengambil data magazine:", error);
+      notify("Gagal mengambil data magazine", "error");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -21,22 +29,28 @@ export default function MagazinesPage() {
     fetchMagazines();
   }, []);
 
-  const handleDelete = async (id) => {
-    const confirmed = confirm("Yakin ingin menghapus magazine ini?");
-    if (!confirmed) return;
-
+  const deleteMagazine = async (id) => {
     try {
-      const res = await fetch(`/api/magazines/${id}`, {
-        method: "DELETE",
-      });
-
-      const data = await res.json();
-      alert(data.message || "Magazine berhasil dihapus");
+      const res = await fetch(`/api/magazines/${id}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      notify(data.message || "Magazine dihapus", res.ok ? "success" : "error");
       fetchMagazines();
     } catch (error) {
       console.error("Gagal menghapus magazine:", error);
-      alert("Terjadi kesalahan saat menghapus data");
+      notify("Terjadi kesalahan saat menghapus data", "error");
     }
+  };
+
+  const handleDelete = (id) => {
+    askConfirm({
+      title: "Hapus magazine",
+      message: "Yakin ingin menghapus magazine ini? Tindakan ini tidak bisa dibatalkan.",
+      danger: true,
+      onConfirm: () => {
+        closeConfirm();
+        deleteMagazine(id);
+      },
+    });
   };
 
   const filteredMagazines = useMemo(() => {
@@ -64,6 +78,8 @@ export default function MagazinesPage() {
 
   return (
     <div className="space-y-6">
+      {feedbackUI}
+
       <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-6">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="max-w-2xl">
@@ -111,10 +127,12 @@ export default function MagazinesPage() {
         </div>
       </div>
 
-      {filteredMagazines.length === 0 ? (
+      {loading ? (
+        <LoadingBlock />
+      ) : filteredMagazines.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-green-200 bg-white p-10 text-center shadow-sm">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-green-50 text-2xl">
-            📄
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-green-50 text-green-600">
+            <BookOpen className="h-6 w-6" />
           </div>
 
           <h3 className="text-2xl font-semibold text-gray-800">
@@ -156,8 +174,8 @@ export default function MagazinesPage() {
                     className="rounded-2xl border border-green-100 bg-white p-5 shadow-sm transition hover:shadow-md"
                   >
                     <div className="flex items-start gap-4">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-red-100 text-xl">
-                        📕
+                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-red-100 text-red-600">
+                        <FileText className="h-6 w-6" />
                       </div>
 
                       <div className="min-w-0 flex-1">
@@ -196,15 +214,17 @@ export default function MagazinesPage() {
 
                       <Link
                         href={`/admin/magazines/edit/${magazine.id}`}
-                        className="inline-flex h-10 items-center justify-center rounded-lg bg-amber-500 px-4 text-sm font-medium text-white hover:bg-amber-600"
+                        className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg bg-amber-500 px-4 text-sm font-medium text-white transition hover:bg-amber-600"
                       >
+                        <Pencil className="h-4 w-4" />
                         Edit
                       </Link>
 
                       <button
                         onClick={() => handleDelete(magazine.id)}
-                        className="inline-flex h-10 items-center justify-center rounded-lg bg-red-600 px-4 text-sm font-medium text-white hover:bg-red-700"
+                        className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg bg-red-600 px-4 text-sm font-medium text-white transition hover:bg-red-700"
                       >
+                        <Trash2 className="h-4 w-4" />
                         Hapus
                       </button>
                     </div>

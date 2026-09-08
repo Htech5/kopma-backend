@@ -1,67 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, X, Trash2, AlertTriangle } from "lucide-react";
-
-// Konfirmasi + toast custom (ganti confirm()/alert() bawaan browser) biar
-// gaya visualnya konsisten dengan kartu admin lain (rounded-2xl, border hijau).
-function ConfirmDialog({ open, title, message, danger, onConfirm, onCancel }) {
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="w-full max-w-sm rounded-2xl border border-green-100 bg-white p-6 shadow-xl">
-        <div className="flex items-start gap-3">
-          <div
-            className={`grid h-10 w-10 shrink-0 place-items-center rounded-full ${
-              danger ? "bg-red-100 text-red-600" : "bg-yellow-100 text-yellow-600"
-            }`}
-          >
-            <AlertTriangle className="h-5 w-5" />
-          </div>
-          <div>
-            <h3 className="font-semibold text-gray-800">{title}</h3>
-            <p className="mt-1 text-sm text-gray-500">{message}</p>
-          </div>
-        </div>
-        <div className="mt-5 flex justify-end gap-2">
-          <button
-            onClick={onCancel}
-            className="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100"
-          >
-            Batal
-          </button>
-          <button
-            onClick={onConfirm}
-            className={`rounded-lg px-4 py-2 text-sm font-semibold text-white ${
-              danger
-                ? "bg-red-600 hover:bg-red-700"
-                : "bg-green-700 hover:bg-green-800"
-            }`}
-          >
-            Ya, lanjutkan
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Toast({ toast }) {
-  if (!toast) return null;
-  const isError = toast.type === "error";
-  return (
-    <div
-      role="status"
-      className={`fixed bottom-6 right-6 z-50 rounded-xl border px-4 py-3 text-sm font-medium shadow-lg ${
-        isError
-          ? "border-red-200 bg-red-50 text-red-700"
-          : "border-green-200 bg-green-50 text-green-700"
-      }`}
-    >
-      {toast.message}
-    </div>
-  );
-}
+import { Check, X, Trash2 } from "lucide-react";
+import { PageHeader, EmptyState, LoadingBlock, useAdminFeedback } from "../_components/AdminUI";
 
 export default function CommentsPage() {
   const [comments, setComments] = useState([]);
@@ -71,17 +12,7 @@ export default function CommentsPage() {
   const [errorMsg, setErrorMsg] = useState("");
   const [selected, setSelected] = useState(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
-  const [confirmState, setConfirmState] = useState(null); // { title, message, danger, onConfirm }
-  const [toast, setToast] = useState(null);
-
-  function notify(message, type = "success") {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
-  }
-
-  function askConfirm({ title, message, danger, onConfirm }) {
-    setConfirmState({ title, message, danger, onConfirm });
-  }
+  const { notify, askConfirm, closeConfirm, feedbackUI } = useAdminFeedback();
 
   async function fetchComments() {
     try {
@@ -191,7 +122,7 @@ export default function CommentsPage() {
           : "Hapus komentar ini secara permanen? Tindakan ini tidak bisa dibatalkan.",
       danger: true,
       onConfirm: () => {
-        setConfirmState(null);
+        closeConfirm();
         bulkDelete(ids);
       },
     });
@@ -263,29 +194,13 @@ export default function CommentsPage() {
 
   return (
     <div className="space-y-6">
-      <ConfirmDialog
-        open={!!confirmState}
-        title={confirmState?.title}
-        message={confirmState?.message}
-        danger={confirmState?.danger}
-        onConfirm={confirmState?.onConfirm}
-        onCancel={() => setConfirmState(null)}
-      />
-      <Toast toast={toast} />
+      {feedbackUI}
 
-      <div className="bg-white rounded-2xl shadow-md border border-green-100 p-6">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div>
-            <p className="inline-block px-4 py-1 rounded-full bg-green-100 text-green-700 text-sm mb-3">
-              Manajemen Komentar
-            </p>
-            <h1 className="text-3xl font-bold text-green-700">Comments</h1>
-            <p className="text-gray-600 mt-2">
-              Kelola komentar masuk, approve, reject, atau hapus.
-            </p>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Manajemen Komentar"
+        title="Comments"
+        description="Kelola komentar masuk, approve, reject, atau hapus."
+      />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white rounded-2xl shadow-md border border-green-100 p-5">
@@ -382,11 +297,22 @@ export default function CommentsPage() {
         </div>
 
         {loading ? (
-          <p className="text-gray-500 p-6">Loading...</p>
+          <div className="p-6">
+            <LoadingBlock rows={4} />
+          </div>
         ) : errorMsg ? (
           <p className="text-red-500 p-6">{errorMsg}</p>
         ) : filteredComments.length === 0 ? (
-          <p className="text-gray-500 p-6">Belum ada komentar.</p>
+          <div className="p-6">
+            <EmptyState
+              title={keyword || statusFilter !== "all" ? "Data tidak ditemukan" : "Belum ada komentar"}
+              description={
+                keyword || statusFilter !== "all"
+                  ? "Coba ubah kata kunci atau filter status."
+                  : "Komentar dari pengunjung akan muncul di sini."
+              }
+            />
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full table-fixed text-sm">

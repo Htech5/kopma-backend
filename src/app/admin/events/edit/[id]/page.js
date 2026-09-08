@@ -1,11 +1,15 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
+import { PageHeader, LoadingBlock, useAdminFeedback } from "../../../_components/AdminUI";
 
 export default function EditEventPage() {
   const { id } = useParams();
   const router = useRouter();
+  const { notify, feedbackUI } = useAdminFeedback();
 
   const [title, setTitle] = useState("");
   const [categoryId, setCategoryId] = useState("");
@@ -37,7 +41,7 @@ export default function EditEventPage() {
         const categoriesData = await categoriesRes.json();
 
         if (!eventRes.ok) {
-          alert(eventData.message || "Event tidak ditemukan");
+          notify(eventData.message || "Event tidak ditemukan", "error");
           router.push("/admin/events");
           return;
         }
@@ -62,7 +66,7 @@ export default function EditEventPage() {
         }
       } catch (error) {
         console.error(error);
-        alert("Gagal mengambil data event");
+        notify("Gagal mengambil data event", "error");
       } finally {
         setFetching(false);
       }
@@ -116,7 +120,7 @@ export default function EditEventPage() {
       await uploadImage(file, "thumbnail");
     } catch (error) {
       console.error(error);
-      alert(error.message || "Gagal upload thumbnail");
+      notify(error.message || "Gagal upload thumbnail", "error");
     } finally {
       setUploadingThumb(false);
     }
@@ -131,7 +135,7 @@ export default function EditEventPage() {
       await uploadImage(file, "top");
     } catch (error) {
       console.error(error);
-      alert(error.message || "Gagal upload gambar atas");
+      notify(error.message || "Gagal upload gambar atas", "error");
     } finally {
       setUploadingTop(false);
     }
@@ -146,7 +150,7 @@ export default function EditEventPage() {
       await uploadImage(file, "middle");
     } catch (error) {
       console.error(error);
-      alert(error.message || "Gagal upload gambar tengah");
+      notify(error.message || "Gagal upload gambar tengah", "error");
     } finally {
       setUploadingMiddle(false);
     }
@@ -180,29 +184,47 @@ export default function EditEventPage() {
       });
 
       const data = await res.json();
-      alert(data.message);
 
       if (res.ok) {
+        notify(data.message || "Event diperbarui");
         router.push("/admin/events");
         router.refresh();
+      } else {
+        notify(data.message || "Gagal update event", "error");
       }
     } catch (error) {
       console.error(error);
-      alert("Gagal update event");
+      notify("Gagal update event", "error");
     } finally {
       setLoading(false);
     }
   }
 
-  if (fetching) {
-    return <p className="text-gray-500">Loading...</p>;
-  }
-
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-      <div className="bg-white rounded-2xl shadow-md border border-green-100 p-6">
-        <h1 className="text-2xl font-bold text-green-700 mb-6">Edit Event</h1>
+    <div className="space-y-6">
+      {feedbackUI}
 
+      <PageHeader
+        eyebrow="Manajemen Event"
+        title="Edit Event"
+        action={
+          <Link
+            href="/admin/events"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-gray-300 px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Kembali
+          </Link>
+        }
+      />
+
+      {fetching ? (
+        <div className="rounded-2xl border border-green-100 bg-white p-6 shadow-sm">
+          <LoadingBlock rows={4} />
+        </div>
+      ) : (
+    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+      <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-6">
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className="block mb-2 text-sm font-medium text-gray-700">
@@ -350,27 +372,17 @@ export default function EditEventPage() {
             </>
           )}
 
-          <div className="flex gap-3">
-            <button
-              type="submit"
-              disabled={loading}
-              className="bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white px-5 py-3 rounded-xl font-semibold"
-            >
-              {loading ? "Menyimpan..." : "Update"}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => router.push("/admin/events")}
-              className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-5 py-3 rounded-xl font-semibold"
-            >
-              Kembali
-            </button>
-          </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="inline-flex h-11 items-center justify-center rounded-xl bg-green-700 px-5 text-sm font-semibold text-white transition hover:bg-green-800 disabled:opacity-70"
+          >
+            {loading ? "Menyimpan..." : "Update"}
+          </button>
         </form>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-md border border-green-100 p-6">
+      <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-6">
         <h2 className="text-2xl font-bold text-green-700 mb-6">Preview Berita</h2>
 
         <div className="border border-green-100 rounded-2xl overflow-hidden bg-white">
@@ -425,6 +437,8 @@ export default function EditEventPage() {
           </div>
         </div>
       </div>
+    </div>
+      )}
     </div>
   );
 }

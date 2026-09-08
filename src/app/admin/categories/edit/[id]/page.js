@@ -1,7 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
+import { PageHeader, LoadingBlock, useAdminFeedback } from "../../../_components/AdminUI";
 
 export default function EditCategoryPage() {
   const { id } = useParams();
@@ -10,6 +13,7 @@ export default function EditCategoryPage() {
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
+  const { notify, feedbackUI } = useAdminFeedback();
 
   useEffect(() => {
     async function fetchCategory() {
@@ -20,12 +24,12 @@ export default function EditCategoryPage() {
         if (res.ok) {
           setName(data.name);
         } else {
-          alert(data.message);
+          notify(data.message || "Kategori tidak ditemukan", "error");
           router.push("/admin/categories");
         }
       } catch (error) {
         console.error(error);
-        alert("Gagal mengambil data kategori");
+        notify("Gagal mengambil data kategori", "error");
       } finally {
         setFetching(false);
       }
@@ -41,71 +45,73 @@ export default function EditCategoryPage() {
     try {
       const res = await fetch(`/api/categories/${id}`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
       });
 
       const data = await res.json();
-      alert(data.message);
 
       if (res.ok) {
+        notify(data.message || "Kategori diperbarui");
         router.push("/admin/categories");
         router.refresh();
+      } else {
+        notify(data.message || "Gagal update kategori", "error");
       }
     } catch (error) {
       console.error(error);
-      alert("Gagal update kategori");
+      notify("Gagal update kategori", "error");
     } finally {
       setLoading(false);
     }
   }
 
-  if (fetching) {
-    return <p className="text-gray-500 text-sm sm:text-base">Loading...</p>;
-  }
-
   return (
-    <div className="w-full max-w-2xl">
-      <div className="bg-white rounded-2xl shadow-md border border-green-100 p-4 sm:p-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-green-700 mb-6">
-          Edit Category
-        </h1>
+    <div className="w-full max-w-2xl space-y-6">
+      {feedbackUI}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label className="block mb-2 text-sm font-medium text-gray-700">
-              Nama Category
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Masukkan nama category"
-              className="w-full rounded-xl border border-green-200 px-4 py-3 text-sm sm:text-base outline-none focus:ring-2 focus:ring-green-500"
-              required
-            />
-          </div>
+      <PageHeader
+        eyebrow="Manajemen Kategori"
+        title="Edit Category"
+        action={
+          <Link
+            href="/admin/categories"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-gray-300 px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Kembali
+          </Link>
+        }
+      />
 
-          <div className="flex flex-col sm:flex-row gap-3">
+      <div className="rounded-2xl border border-green-100 bg-white p-6 shadow-sm">
+        {fetching ? (
+          <LoadingBlock rows={1} />
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">
+                Nama Category
+              </label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Masukkan nama category"
+                className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100 sm:text-base"
+                required
+              />
+            </div>
+
             <button
               type="submit"
               disabled={loading}
-              className="w-full sm:w-auto bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white px-5 py-3 rounded-xl font-semibold"
+              className="inline-flex h-11 items-center justify-center rounded-xl bg-green-700 px-5 text-sm font-semibold text-white transition hover:bg-green-800 disabled:opacity-70"
             >
               {loading ? "Menyimpan..." : "Update"}
             </button>
-
-            <button
-              type="button"
-              onClick={() => router.push("/admin/categories")}
-              className="w-full sm:w-auto bg-gray-200 hover:bg-gray-300 text-gray-800 px-5 py-3 rounded-xl font-semibold"
-            >
-              Kembali
-            </button>
-          </div>
-        </form>
+          </form>
+        )}
       </div>
     </div>
   );

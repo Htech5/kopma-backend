@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { ImageOff, Package, Pencil, Trash2 } from "lucide-react";
+import { PageHeader, EmptyState, LoadingBlock, useAdminFeedback } from "../_components/AdminUI";
 
 const INITIAL_FORM = {
   nama: "",
@@ -28,7 +30,7 @@ export default function AdminInventarisPage() {
   const [form, setForm] = useState(INITIAL_FORM);
   const [previewUrl, setPreviewUrl] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
-  const [successMsg, setSuccessMsg] = useState("");
+  const { notify, askConfirm, closeConfirm, feedbackUI } = useAdminFeedback();
 
   async function fetchInventaris() {
     try {
@@ -76,7 +78,6 @@ export default function AdminInventarisPage() {
     setEditingId(null);
     setHapusGambarSaatEdit(false);
     setErrorMsg("");
-    setSuccessMsg("");
 
     if (previewUrl && previewUrl.startsWith("blob:")) {
       URL.revokeObjectURL(previewUrl);
@@ -97,12 +98,12 @@ export default function AdminInventarisPage() {
 
     if (file) {
       if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-        alert("File harus berupa gambar JPEG, PNG, atau WebP");
+        notify("File harus berupa gambar JPEG, PNG, atau WebP", "error");
         e.target.value = "";
         return;
       }
       if (file.size > 5 * 1024 * 1024) {
-        alert("Ukuran gambar maksimal 5 MB");
+        notify("Ukuran gambar maksimal 5 MB", "error");
         e.target.value = "";
         return;
       }
@@ -128,7 +129,6 @@ export default function AdminInventarisPage() {
   function handleEdit(item) {
     setEditingId(item.id);
     setErrorMsg("");
-    setSuccessMsg("");
     setHapusGambarSaatEdit(false);
 
     if (previewUrl && previewUrl.startsWith("blob:")) {
@@ -153,7 +153,6 @@ export default function AdminInventarisPage() {
     try {
       setSaving(true);
       setErrorMsg("");
-      setSuccessMsg("");
 
       if (!form.nama.trim()) {
         throw new Error("Nama inventaris wajib diisi");
@@ -187,7 +186,7 @@ export default function AdminInventarisPage() {
         throw new Error(data.message || data.detail || `HTTP ${res.status}`);
       }
 
-      setSuccessMsg(
+      notify(
         data.message ||
           (editingId
             ? "Inventaris berhasil diperbarui"
@@ -204,13 +203,9 @@ export default function AdminInventarisPage() {
     }
   }
 
-  async function handleDelete(id) {
-    const ok = confirm("Yakin ingin menghapus inventaris ini?");
-    if (!ok) return;
-
+  async function deleteInventaris(id) {
     try {
       setErrorMsg("");
-      setSuccessMsg("");
 
       const res = await fetch(`/api/inventaris/${id}`, {
         method: "DELETE",
@@ -225,7 +220,7 @@ export default function AdminInventarisPage() {
         throw new Error(data.message || data.detail || `HTTP ${res.status}`);
       }
 
-      setSuccessMsg(data.message || "Inventaris berhasil dihapus");
+      notify(data.message || "Inventaris berhasil dihapus");
 
       if (editingId === id) {
         resetForm();
@@ -234,8 +229,20 @@ export default function AdminInventarisPage() {
       await fetchInventaris();
     } catch (error) {
       console.error("[AdminInventaris] delete error:", error);
-      setErrorMsg(error.message || "Gagal menghapus inventaris");
+      notify(error.message || "Gagal menghapus inventaris", "error");
     }
+  }
+
+  function handleDelete(id) {
+    askConfirm({
+      title: "Hapus inventaris",
+      message: "Yakin ingin menghapus inventaris ini? Tindakan ini tidak bisa dibatalkan.",
+      danger: true,
+      onConfirm: () => {
+        closeConfirm();
+        deleteInventaris(id);
+      },
+    });
   }
 
   const filteredItems = useMemo(() => {
@@ -260,21 +267,15 @@ export default function AdminInventarisPage() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-2xl shadow-md border border-green-100 p-6">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div>
-            <p className="inline-block px-4 py-1 rounded-full bg-green-100 text-green-700 text-sm mb-3">
-              Manajemen Inventaris
-            </p>
-            <h1 className="text-3xl font-bold text-green-700">Inventaris</h1>
-            <p className="text-gray-600 mt-2">
-              Kelola data inventaris, gambar, harga sewa, stok, dan stok tersedia.
-            </p>
-          </div>
-        </div>
-      </div>
+      {feedbackUI}
 
-      <div className="bg-white rounded-2xl shadow-md border border-green-100 p-6">
+      <PageHeader
+        eyebrow="Manajemen Inventaris"
+        title="Inventaris"
+        description="Kelola data inventaris, gambar, harga sewa, stok, dan stok tersedia."
+      />
+
+      <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-6">
         <h2 className="text-xl font-bold text-gray-800 mb-4">
           {editingId ? "Edit Inventaris" : "Tambah Inventaris"}
         </h2>
@@ -282,12 +283,6 @@ export default function AdminInventarisPage() {
         {errorMsg && (
           <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-700">
             {errorMsg}
-          </div>
-        )}
-
-        {successMsg && (
-          <div className="mb-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-green-700">
-            {successMsg}
           </div>
         )}
 
@@ -430,17 +425,25 @@ export default function AdminInventarisPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-md border border-green-100 p-6">
+      <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-6">
         {loading ? (
-          <p className="text-gray-500">Loading...</p>
+          <LoadingBlock />
         ) : filteredItems.length === 0 ? (
-          <p className="text-gray-500">Belum ada data inventaris.</p>
+          <EmptyState
+            icon={Package}
+            title={keyword ? "Data tidak ditemukan" : "Belum ada data inventaris"}
+            description={
+              keyword
+                ? "Coba gunakan kata kunci lain."
+                : "Tambahkan inventaris pertama lewat form di atas."
+            }
+          />
         ) : (
           <div className="space-y-4">
             {filteredItems.map((item) => (
               <div
                 key={item.id}
-                className="border border-green-100 rounded-2xl p-5"
+                className="rounded-2xl border border-green-100 p-5 transition hover:shadow-md"
               >
                 <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
                   <div className="flex gap-4 flex-1">
@@ -453,7 +456,7 @@ export default function AdminInventarisPage() {
                           className="w-full h-full object-cover"
                         />
                       ) : (
-                        <span className="text-gray-400 text-sm">No Image</span>
+                        <ImageOff className="h-6 w-6 text-gray-300" />
                       )}
                     </div>
 
@@ -480,15 +483,17 @@ export default function AdminInventarisPage() {
                   <div className="flex flex-wrap gap-2 lg:w-56">
                     <button
                       onClick={() => handleEdit(item)}
-                      className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-amber-600"
                     >
+                      <Pencil className="h-4 w-4" />
                       Edit
                     </button>
 
                     <button
                       onClick={() => handleDelete(item.id)}
-                      className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700"
                     >
+                      <Trash2 className="h-4 w-4" />
                       Hapus
                     </button>
                   </div>

@@ -1,10 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
+import { PageHeader, useAdminFeedback } from "../../_components/AdminUI";
 
 export default function CreateEventPage() {
   const router = useRouter();
+  const { notify, feedbackUI } = useAdminFeedback();
 
   const [title, setTitle] = useState("");
   const [categoryId, setCategoryId] = useState("");
@@ -31,7 +35,7 @@ export default function CreateEventPage() {
         setCategories(data);
       } catch (error) {
         console.error(error);
-        alert("Gagal mengambil kategori");
+        notify("Gagal mengambil kategori", "error");
       }
     }
 
@@ -83,7 +87,7 @@ export default function CreateEventPage() {
       await uploadImage(file, "thumbnail");
     } catch (error) {
       console.error(error);
-      alert(error.message || "Gagal upload thumbnail");
+      notify(error.message || "Gagal upload thumbnail", "error");
     } finally {
       setUploadingThumb(false);
     }
@@ -98,7 +102,7 @@ export default function CreateEventPage() {
       await uploadImage(file, "top");
     } catch (error) {
       console.error(error);
-      alert(error.message || "Gagal upload gambar atas");
+      notify(error.message || "Gagal upload gambar atas", "error");
     } finally {
       setUploadingTop(false);
     }
@@ -113,7 +117,7 @@ export default function CreateEventPage() {
       await uploadImage(file, "middle");
     } catch (error) {
       console.error(error);
-      alert(error.message || "Gagal upload gambar tengah");
+      notify(error.message || "Gagal upload gambar tengah", "error");
     } finally {
       setUploadingMiddle(false);
     }
@@ -147,26 +151,42 @@ export default function CreateEventPage() {
       });
 
       const data = await res.json();
-    console.log("CREATE EVENT RESPONSE:", data);
-    alert(data.detail || data.error || data.message);
 
       if (res.ok) {
+        notify(data.message || "Event ditambahkan");
         router.push("/admin/events");
         router.refresh();
+      } else {
+        notify(data.detail || data.error || data.message || "Gagal menambahkan event", "error");
       }
     } catch (error) {
       console.error(error);
-      alert("Gagal menambahkan event");
+      notify("Gagal menambahkan event", "error");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-      <div className="bg-white rounded-2xl shadow-md border border-green-100 p-6">
-        <h1 className="text-2xl font-bold text-green-700 mb-6">Tambah Event</h1>
+    <div className="space-y-6">
+      {feedbackUI}
 
+      <PageHeader
+        eyebrow="Manajemen Event"
+        title="Tambah Event"
+        action={
+          <Link
+            href="/admin/events"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-gray-300 px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Kembali
+          </Link>
+        }
+      />
+
+    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+      <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-6">
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className="block mb-2 text-sm font-medium text-gray-700">
@@ -317,27 +337,17 @@ export default function CreateEventPage() {
             </>
           )}
 
-          <div className="flex gap-3">
-            <button
-              type="submit"
-              disabled={loading}
-              className="bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white px-5 py-3 rounded-xl font-semibold"
-            >
-              {loading ? "Menyimpan..." : "Simpan"}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => router.push("/admin/events")}
-              className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-5 py-3 rounded-xl font-semibold"
-            >
-              Kembali
-            </button>
-          </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="inline-flex h-11 items-center justify-center rounded-xl bg-green-700 px-5 text-sm font-semibold text-white transition hover:bg-green-800 disabled:opacity-70"
+          >
+            {loading ? "Menyimpan..." : "Simpan"}
+          </button>
         </form>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-md border border-green-100 p-6">
+      <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-6">
         <h2 className="text-2xl font-bold text-green-700 mb-6">Preview Berita</h2>
 
         <div className="border border-green-100 rounded-2xl overflow-hidden bg-white">
@@ -392,6 +402,7 @@ export default function CreateEventPage() {
           </div>
         </div>
       </div>
+    </div>
     </div>
   );
 }

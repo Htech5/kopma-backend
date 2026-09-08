@@ -3,9 +3,12 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ArrowLeft, FileUp, Eye } from "lucide-react";
+import { useAdminFeedback } from "../../_components/AdminUI";
 
 export default function CreateMagazinePage() {
   const router = useRouter();
+  const { notify, feedbackUI } = useAdminFeedback();
 
   const [title, setTitle] = useState("");
   const [year, setYear] = useState("");
@@ -32,7 +35,7 @@ export default function CreateMagazinePage() {
     if (!selectedFile) return;
 
     if (selectedFile.type !== "application/pdf") {
-      alert("File harus berupa PDF");
+      notify("File harus berupa PDF", "error");
       return;
     }
 
@@ -40,7 +43,7 @@ export default function CreateMagazinePage() {
     const sizeMb = selectedFile.size / (1024 * 1024);
 
     if (sizeMb > maxSizeMb) {
-      alert(`Ukuran file maksimal ${maxSizeMb} MB`);
+      notify(`Ukuran file maksimal ${maxSizeMb} MB`, "error");
       return;
     }
 
@@ -56,7 +59,7 @@ export default function CreateMagazinePage() {
     e.preventDefault();
 
     if (!title.trim() || !year || !file) {
-      alert("Semua field wajib diisi");
+      notify("Semua field wajib diisi", "error");
       return;
     }
 
@@ -76,15 +79,15 @@ export default function CreateMagazinePage() {
       const data = await res.json();
 
       if (!res.ok) {
-        alert(data.message || "Gagal menambahkan magazine");
+        notify(data.message || "Gagal menambahkan magazine", "error");
         return;
       }
 
-      alert(data.message || "Magazine berhasil ditambahkan");
+      notify(data.message || "Magazine berhasil ditambahkan");
       router.push("/admin/magazines");
     } catch (error) {
       console.error(error);
-      alert("Terjadi kesalahan");
+      notify("Terjadi kesalahan", "error");
     } finally {
       setLoading(false);
     }
@@ -92,6 +95,8 @@ export default function CreateMagazinePage() {
 
   return (
     <div className="space-y-6">
+      {feedbackUI}
+
       <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-5 md:p-7">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
@@ -108,9 +113,10 @@ export default function CreateMagazinePage() {
 
           <Link
             href="/admin/magazines"
-            className="inline-flex h-11 items-center justify-center rounded-xl border border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-gray-300 px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
           >
-            ← Kembali
+            <ArrowLeft className="h-4 w-4" />
+            Kembali
           </Link>
         </div>
       </div>
@@ -150,7 +156,7 @@ export default function CreateMagazinePage() {
               </label>
 
               <label className="flex min-h-[160px] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-green-300 bg-green-50 px-5 py-6 text-center transition hover:bg-green-100">
-                <span className="mb-3 text-4xl">📄</span>
+                <FileUp className="mb-3 h-9 w-9 text-green-600" />
                 <span className="text-base md:text-lg font-semibold text-green-700">
                   Klik untuk pilih file PDF
                 </span>
@@ -211,7 +217,7 @@ export default function CreateMagazinePage() {
           {!previewUrl ? (
             <div className="mt-5 flex min-h-[320px] md:min-h-[500px] items-center justify-center rounded-2xl border-2 border-dashed border-gray-200 px-6 text-center">
               <div>
-                <div className="mb-3 text-5xl">👀</div>
+                <Eye className="mx-auto mb-3 h-10 w-10 text-gray-300" />
                 <p className="text-lg font-semibold text-gray-700">
                   Belum ada preview
                 </p>
