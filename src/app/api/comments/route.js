@@ -54,6 +54,36 @@ export async function GET(request) {
   }
 }
 
+export async function DELETE(request) {
+  try {
+    if (!(await requireAuth())) {
+      return NextResponse.json({ message: "Tidak diautentikasi" }, { status: 401 });
+    }
+
+    const body = await request.json().catch(() => ({}));
+    const ids = (Array.isArray(body.ids) ? body.ids : [body.id]).filter(Boolean);
+
+    if (ids.length === 0) {
+      return NextResponse.json(
+        { message: "ID komentar wajib dikirim" },
+        { status: 400 }
+      );
+    }
+
+    const [result] = await db.query("DELETE FROM comments WHERE id IN (?)", [ids]);
+
+    return NextResponse.json({
+      message: `${result.affectedRows} komentar berhasil dihapus`,
+    });
+  } catch (error) {
+    console.error("DELETE comments (bulk) error:", error);
+    return NextResponse.json(
+      { message: "Gagal menghapus komentar" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(request) {
   try {
     const body = await request.json();

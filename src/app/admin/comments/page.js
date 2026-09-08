@@ -1,6 +1,67 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Check, X, Trash2, AlertTriangle } from "lucide-react";
+
+// Konfirmasi + toast custom (ganti confirm()/alert() bawaan browser) biar
+// gaya visualnya konsisten dengan kartu admin lain (rounded-2xl, border hijau).
+function ConfirmDialog({ open, title, message, danger, onConfirm, onCancel }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="w-full max-w-sm rounded-2xl border border-green-100 bg-white p-6 shadow-xl">
+        <div className="flex items-start gap-3">
+          <div
+            className={`grid h-10 w-10 shrink-0 place-items-center rounded-full ${
+              danger ? "bg-red-100 text-red-600" : "bg-yellow-100 text-yellow-600"
+            }`}
+          >
+            <AlertTriangle className="h-5 w-5" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-gray-800">{title}</h3>
+            <p className="mt-1 text-sm text-gray-500">{message}</p>
+          </div>
+        </div>
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            onClick={onCancel}
+            className="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100"
+          >
+            Batal
+          </button>
+          <button
+            onClick={onConfirm}
+            className={`rounded-lg px-4 py-2 text-sm font-semibold text-white ${
+              danger
+                ? "bg-red-600 hover:bg-red-700"
+                : "bg-green-700 hover:bg-green-800"
+            }`}
+          >
+            Ya, lanjutkan
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Toast({ toast }) {
+  if (!toast) return null;
+  const isError = toast.type === "error";
+  return (
+    <div
+      role="status"
+      className={`fixed bottom-6 right-6 z-50 rounded-xl border px-4 py-3 text-sm font-medium shadow-lg ${
+        isError
+          ? "border-red-200 bg-red-50 text-red-700"
+          : "border-green-200 bg-green-50 text-green-700"
+      }`}
+    >
+      {toast.message}
+    </div>
+  );
+}
 
 export default function CommentsPage() {
   const [comments, setComments] = useState([]);
@@ -10,6 +71,17 @@ export default function CommentsPage() {
   const [errorMsg, setErrorMsg] = useState("");
   const [selected, setSelected] = useState(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [confirmState, setConfirmState] = useState(null); // { title, message, danger, onConfirm }
+  const [toast, setToast] = useState(null);
+
+  function notify(message, type = "success") {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  }
+
+  function askConfirm({ title, message, danger, onConfirm }) {
+    setConfirmState({ title, message, danger, onConfirm });
+  }
 
   async function fetchComments() {
     try {
@@ -44,20 +116,6 @@ export default function CommentsPage() {
     fetchComments();
   }, []);
 
-  async function handleApprove(id) {
-    await bulkApprove([id]);
-  }
-
-  async function handleReject(id) {
-    await bulkReject([id]);
-  }
-
-  async function handleDelete(id) {
-    const ok = confirm("Yakin ingin menghapus komentar ini secara permanen?");
-    if (!ok) return;
-    await bulkDelete([id]);
-  }
-
   async function bulkApprove(ids) {
     if (ids.length === 0) return;
     try {
@@ -69,11 +127,12 @@ export default function CommentsPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.message || data.detail || `HTTP ${res.status}`);
+      notify(data.message || `${ids.length} komentar di-approve`);
       setSelected(new Set());
       await fetchComments();
     } catch (error) {
       console.error("[AdminComments] approve error:", error);
-      alert(error.message || "Gagal approve komentar");
+      notify(error.message || "Gagal approve komentar", "error");
     } finally {
       setBulkBusy(false);
     }
@@ -90,11 +149,12 @@ export default function CommentsPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.message || data.detail || `HTTP ${res.status}`);
+      notify(data.message || `${ids.length} komentar di-reject`);
       setSelected(new Set());
       await fetchComments();
     } catch (error) {
       console.error("[AdminComments] reject error:", error);
-      alert(error.message || "Gagal reject komentar");
+      notify(error.message || "Gagal reject komentar", "error");
     } finally {
       setBulkBusy(false);
     }
@@ -104,23 +164,37 @@ export default function CommentsPage() {
     if (ids.length === 0) return;
     try {
       setBulkBusy(true);
-      const results = await Promise.allSettled(
-        ids.map((id) =>
-          fetch(`/api/comments/${id}`, {
-            method: "DELETE",
-            headers: { Accept: "application/json" },
-          }).then((res) => {
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          })
-        )
-      );
-      const failed = results.filter((r) => r.status === "rejected").length;
-      if (failed > 0) alert(`${failed} komentar gagal dihapus.`);
+      const res = await fetch("/api/comments", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || data.detail || `HTTP ${res.status}`);
+      notify(data.message || `${ids.length} komentar dihapus`);
       setSelected(new Set());
       await fetchComments();
+    } catch (error) {
+      console.error("[AdminComments] bulk delete error:", error);
+      notify(error.message || "Gagal menghapus komentar", "error");
     } finally {
       setBulkBusy(false);
     }
+  }
+
+  function confirmDelete(ids) {
+    askConfirm({
+      title: "Hapus permanen",
+      message:
+        ids.length > 1
+          ? `Hapus ${ids.length} komentar terpilih secara permanen? Tindakan ini tidak bisa dibatalkan.`
+          : "Hapus komentar ini secara permanen? Tindakan ini tidak bisa dibatalkan.",
+      danger: true,
+      onConfirm: () => {
+        setConfirmState(null);
+        bulkDelete(ids);
+      },
+    });
   }
 
   function toggleSelected(id) {
@@ -189,6 +263,16 @@ export default function CommentsPage() {
 
   return (
     <div className="space-y-6">
+      <ConfirmDialog
+        open={!!confirmState}
+        title={confirmState?.title}
+        message={confirmState?.message}
+        danger={confirmState?.danger}
+        onConfirm={confirmState?.onConfirm}
+        onCancel={() => setConfirmState(null)}
+      />
+      <Toast toast={toast} />
+
       <div className="bg-white rounded-2xl shadow-md border border-green-100 p-6">
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
@@ -249,46 +333,54 @@ export default function CommentsPage() {
         </div>
       </div>
 
-      {selected.size > 0 && (
-        <div className="sticky top-0 z-10 flex flex-wrap items-center gap-3 rounded-2xl border border-green-200 bg-green-50 p-4 shadow-sm">
-          <span className="text-sm font-medium text-green-800">
-            {selected.size} komentar dipilih
-          </span>
-          <div className="ml-auto flex flex-wrap gap-2">
-            <button
-              disabled={bulkBusy}
-              onClick={() => bulkApprove(selectedIds)}
-              className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm"
-            >
-              Approve terpilih
-            </button>
-            <button
-              disabled={bulkBusy}
-              onClick={() => bulkReject(selectedIds)}
-              className="bg-yellow-500 hover:bg-yellow-600 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm"
-            >
-              Reject terpilih
-            </button>
-            <button
-              disabled={bulkBusy}
-              onClick={() => {
-                if (
-                  confirm(
-                    `Hapus permanen ${selectedIds.length} komentar terpilih? Tindakan ini tidak bisa dibatalkan.`
-                  )
-                ) {
-                  bulkDelete(selectedIds);
-                }
-              }}
-              className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm"
-            >
-              Hapus permanen
-            </button>
-          </div>
-        </div>
-      )}
+      <div className="bg-white rounded-2xl shadow-md border border-green-100 overflow-hidden">
+        <div className="flex flex-wrap items-center gap-3 border-b border-green-100 px-6 py-4">
+          <label className="flex items-center gap-2 text-sm text-gray-600">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              onChange={toggleSelectAll}
+              disabled={filteredComments.length === 0}
+              className="h-4 w-4 rounded border-gray-300 accent-green-700"
+            />
+            Pilih semua
+          </label>
 
-      <div className="bg-white rounded-2xl shadow-md border border-green-100 overflow-x-auto">
+          {selected.size > 0 && (
+            <>
+              <span className="text-sm font-medium text-green-800">
+                {selected.size} dipilih
+              </span>
+              <div className="ml-auto flex flex-wrap gap-2">
+                <button
+                  disabled={bulkBusy}
+                  onClick={() => bulkApprove(selectedIds)}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-2 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-50"
+                >
+                  <Check className="h-3.5 w-3.5" />
+                  Approve
+                </button>
+                <button
+                  disabled={bulkBusy}
+                  onClick={() => bulkReject(selectedIds)}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-yellow-500 px-3 py-2 text-xs font-semibold text-white hover:bg-yellow-600 disabled:opacity-50"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  Reject
+                </button>
+                <button
+                  disabled={bulkBusy}
+                  onClick={() => confirmDelete(selectedIds)}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Hapus permanen
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+
         {loading ? (
           <p className="text-gray-500 p-6">Loading...</p>
         ) : errorMsg ? (
@@ -296,102 +388,111 @@ export default function CommentsPage() {
         ) : filteredComments.length === 0 ? (
           <p className="text-gray-500 p-6">Belum ada komentar.</p>
         ) : (
-          <table className="w-full min-w-[900px] text-sm">
-            <thead>
-              <tr className="border-b border-green-100 bg-green-50/60 text-left text-gray-600">
-                <th className="w-10 px-4 py-3">
-                  <input
-                    type="checkbox"
-                    checked={allSelected}
-                    onChange={toggleSelectAll}
-                    className="h-4 w-4 rounded border-gray-300 accent-green-700"
-                    aria-label="Pilih semua"
-                  />
-                </th>
-                <th className="px-3 py-3 font-semibold">Pengirim</th>
-                <th className="px-3 py-3 font-semibold">Komentar</th>
-                <th className="px-3 py-3 font-semibold">Konten</th>
-                <th className="px-3 py-3 font-semibold">Tanggal</th>
-                <th className="px-3 py-3 font-semibold">Status</th>
-                <th className="px-3 py-3 font-semibold text-right">Aksi</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredComments.map((item) => (
-                <tr
-                  key={item.id}
-                  className={`border-b border-gray-100 align-top ${
-                    selected.has(item.id) ? "bg-green-50/40" : ""
-                  }`}
-                >
-                  <td className="px-4 py-3">
-                    <input
-                      type="checkbox"
-                      checked={selected.has(item.id)}
-                      onChange={() => toggleSelected(item.id)}
-                      className="h-4 w-4 rounded border-gray-300 accent-green-700"
-                      aria-label={`Pilih komentar dari ${item.name || "-"}`}
-                    />
-                  </td>
-                  <td className="px-3 py-3">
-                    <p className="font-semibold text-gray-800">
-                      {item.name || "-"}
-                    </p>
-                    <p className="text-xs text-gray-500">{item.email || "-"}</p>
-                  </td>
-                  <td className="px-3 py-3 max-w-xs">
-                    <p className="text-gray-700 whitespace-pre-line break-words">
-                      {item.comment || "-"}
-                    </p>
-                  </td>
-                  <td className="px-3 py-3 text-xs text-gray-500">
-                    <p>{item.content_type || "-"}</p>
-                    <p>#{item.content_id || "-"}</p>
-                  </td>
-                  <td className="px-3 py-3 text-xs text-gray-500 whitespace-nowrap">
-                    {item.created_at
-                      ? new Date(item.created_at).toLocaleString("id-ID")
-                      : "-"}
-                  </td>
-                  <td className="px-3 py-3">
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${getStatusBadge(
-                        item.status
-                      )}`}
-                    >
-                      {item.status || "pending"}
-                    </span>
-                  </td>
-                  <td className="px-3 py-3">
-                    <div className="flex flex-wrap justify-end gap-2">
-                      {item.status !== "approved" && (
-                        <button
-                          onClick={() => handleApprove(item.id)}
-                          className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-xs"
-                        >
-                          Approve
-                        </button>
-                      )}
-                      {item.status !== "rejected" && (
-                        <button
-                          onClick={() => handleReject(item.id)}
-                          className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1.5 rounded-lg text-xs"
-                        >
-                          Reject
-                        </button>
-                      )}
-                      <button
-                        onClick={() => handleDelete(item.id)}
-                        className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs"
-                      >
-                        Hapus
-                      </button>
-                    </div>
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full table-fixed text-sm">
+              <colgroup>
+                <col className="w-10" />
+                <col className="w-44" />
+                <col />
+                <col className="w-36" />
+                <col className="w-32" />
+                <col className="w-24" />
+                <col className="w-40" />
+              </colgroup>
+              <thead>
+                <tr className="border-b border-green-100 bg-green-50/60 text-left text-xs uppercase tracking-wide text-gray-500">
+                  <th className="px-4 py-3" />
+                  <th className="px-3 py-3 font-semibold">Pengirim</th>
+                  <th className="px-3 py-3 font-semibold">Komentar</th>
+                  <th className="px-3 py-3 font-semibold">Konten</th>
+                  <th className="px-3 py-3 font-semibold">Tanggal</th>
+                  <th className="px-3 py-3 font-semibold">Status</th>
+                  <th className="px-3 py-3 font-semibold text-right">Aksi</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filteredComments.map((item) => (
+                  <tr
+                    key={item.id}
+                    className={selected.has(item.id) ? "bg-green-50/40" : ""}
+                  >
+                    <td className="px-4 py-3 align-top">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(item.id)}
+                        onChange={() => toggleSelected(item.id)}
+                        className="h-4 w-4 rounded border-gray-300 accent-green-700"
+                        aria-label={`Pilih komentar dari ${item.name || "-"}`}
+                      />
+                    </td>
+                    <td className="px-3 py-3 align-top">
+                      <p className="truncate font-semibold text-gray-800">
+                        {item.name || "-"}
+                      </p>
+                      <p className="truncate text-xs text-gray-500">
+                        {item.email || "-"}
+                      </p>
+                    </td>
+                    <td className="px-3 py-3 align-top">
+                      <p className="line-clamp-3 whitespace-pre-line text-gray-700">
+                        {item.comment || "-"}
+                      </p>
+                    </td>
+                    <td className="px-3 py-3 align-top text-xs text-gray-500">
+                      <p className="truncate">{item.content_type || "-"}</p>
+                      <p className="truncate">#{item.content_id || "-"}</p>
+                    </td>
+                    <td className="px-3 py-3 align-top text-xs text-gray-500">
+                      {item.created_at
+                        ? new Date(item.created_at).toLocaleString("id-ID", {
+                            dateStyle: "medium",
+                            timeStyle: "short",
+                          })
+                        : "-"}
+                    </td>
+                    <td className="px-3 py-3 align-top">
+                      <span
+                        className={`inline-block rounded-full px-3 py-1 text-xs font-semibold whitespace-nowrap ${getStatusBadge(
+                          item.status
+                        )}`}
+                      >
+                        {item.status || "pending"}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3 align-top">
+                      <div className="flex justify-end gap-1.5">
+                        {item.status !== "approved" && (
+                          <button
+                            onClick={() => bulkApprove([item.id])}
+                            title="Approve"
+                            className="grid h-8 w-8 place-items-center rounded-lg bg-green-100 text-green-700 hover:bg-green-200"
+                          >
+                            <Check className="h-4 w-4" />
+                          </button>
+                        )}
+                        {item.status !== "rejected" && (
+                          <button
+                            onClick={() => bulkReject([item.id])}
+                            title="Reject"
+                            className="grid h-8 w-8 place-items-center rounded-lg bg-yellow-100 text-yellow-700 hover:bg-yellow-200"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => confirmDelete([item.id])}
+                          title="Hapus permanen"
+                          className="grid h-8 w-8 place-items-center rounded-lg bg-red-100 text-red-700 hover:bg-red-200"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>
