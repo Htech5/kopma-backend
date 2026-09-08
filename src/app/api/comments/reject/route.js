@@ -9,9 +9,10 @@ export async function PATCH(request) {
     }
 
     const body = await request.json();
-    const { id } = body;
+    const ids = Array.isArray(body.ids) ? body.ids : [body.id];
+    const cleanIds = ids.filter(Boolean);
 
-    if (!id) {
+    if (cleanIds.length === 0) {
       return NextResponse.json(
         { message: "ID komentar wajib dikirim" },
         { status: 400 }
@@ -19,8 +20,8 @@ export async function PATCH(request) {
     }
 
     const [result] = await db.query(
-      "UPDATE comments SET status = 'rejected' WHERE id = ?",
-      [id]
+      "UPDATE comments SET status = 'rejected' WHERE id IN (?)",
+      [cleanIds]
     );
 
     if (result.affectedRows === 0) {
