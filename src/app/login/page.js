@@ -9,64 +9,146 @@ import { fetchWithRetry } from "@/lib/fetchWithRetry";
 
 const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
-// Koin melayang: posisi/durasi tetap biar server & client render sama.
-const COINS = [
-  { left: 6, size: 34, delay: 0, dur: 17 },
-  { left: 18, size: 22, delay: 4, dur: 21 },
-  { left: 31, size: 44, delay: 8, dur: 15 },
-  { left: 47, size: 26, delay: 2, dur: 23 },
-  { left: 62, size: 38, delay: 11, dur: 18 },
-  { left: 76, size: 24, delay: 6, dur: 20 },
-  { left: 89, size: 40, delay: 13, dur: 16 },
-];
+// Hujan uang di <canvas>: reactbits-style "falling particles" tapi bertema
+// rupiah — kartu koin emas + lembar uang hijau, rotate + sway ringan.
+// Satu rAF loop, DPI-aware, berhenti kalau prefers-reduced-motion atau tab
+// disembunyikan. Tidak butuh GSAP: gerakan sesederhana ini murah lewat
+// requestAnimationFrame biasa.
+function MoneyRain() {
+  const canvasRef = useRef(null);
 
-function MoneyBackground() {
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const reduceMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+
+    const ctx = canvas.getContext("2d");
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    let w = 0;
+    let h = 0;
+
+    function resize() {
+      w = window.innerWidth;
+      h = window.innerHeight;
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      canvas.style.width = `${w}px`;
+      canvas.style.height = `${h}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    resize();
+    window.addEventListener("resize", resize);
+
+    const COUNT = 26;
+    const items = Array.from({ length: COUNT }, () => spawn(true));
+
+    function spawn(initial) {
+      const isCoin = Math.random() > 0.45;
+      return {
+        x: Math.random() * w,
+        y: initial ? Math.random() * h : -40,
+        size: isCoin ? 14 + Math.random() * 14 : 22 + Math.random() * 16,
+        speed: 18 + Math.random() * 22,
+        drift: (Math.random() - 0.5) * 18,
+        angle: Math.random() * Math.PI * 2,
+        spin: (Math.random() - 0.5) * 0.8,
+        sway: Math.random() * Math.PI * 2,
+        isCoin,
+        opacity: 0.35 + Math.random() * 0.35,
+      };
+    }
+
+    function drawCoin(p) {
+      const g = ctx.createLinearGradient(-p.size, -p.size, p.size, p.size);
+      g.addColorStop(0, "#fde68a");
+      g.addColorStop(1, "#d97706");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(0, 0, p.size / 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "rgba(120,53,15,0.75)";
+      ctx.font = `bold ${p.size * 0.42}px system-ui, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("Rp", 0, 1);
+    }
+
+    function drawNote(p) {
+      const wid = p.size;
+      const hei = p.size * 0.55;
+      const g = ctx.createLinearGradient(-wid / 2, 0, wid / 2, 0);
+      g.addColorStop(0, "#6ee7b7");
+      g.addColorStop(1, "#16a34a");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.roundRect(-wid / 2, -hei / 2, wid, hei, 3);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.55)";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(-wid / 2 + 3, -hei / 2 + 3, wid - 6, hei - 6);
+      ctx.beginPath();
+      ctx.arc(0, 0, hei * 0.22, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(255,255,255,0.6)";
+      ctx.fill();
+    }
+
+    let raf;
+    let last = performance.now();
+
+    function frame(now) {
+      const dt = Math.min((now - last) / 1000, 0.05);
+      last = now;
+      ctx.clearRect(0, 0, w, h);
+
+      for (const p of items) {
+        p.y += p.speed * dt;
+        p.sway += dt * 1.2;
+        p.x += (Math.sin(p.sway) * 6 + p.drift) * dt;
+        p.angle += p.spin * dt;
+
+        if (p.y - p.size > h) Object.assign(p, spawn(false));
+
+        ctx.save();
+        ctx.globalAlpha = p.opacity;
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.angle);
+        if (p.isCoin) drawCoin(p);
+        else drawNote(p);
+        ctx.restore();
+      }
+
+      raf = requestAnimationFrame(frame);
+    }
+
+    if (!reduceMotion) raf = requestAnimationFrame(frame);
+
+    function onVisibility() {
+      if (document.hidden) {
+        cancelAnimationFrame(raf);
+      } else if (!reduceMotion) {
+        last = performance.now();
+        raf = requestAnimationFrame(frame);
+      }
+    }
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", resize);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
+
   return (
     <div
       aria-hidden
       className="pointer-events-none fixed inset-0 overflow-hidden"
     >
       <div className="absolute inset-0 bg-gradient-to-b from-emerald-50 via-[#f0faf4] to-emerald-100/60" />
-
-      {COINS.map((c, i) => (
-        <span
-          key={i}
-          className="coin absolute bottom-[-60px] grid place-items-center rounded-full bg-gradient-to-br from-amber-300 to-amber-500 font-bold text-amber-900 shadow-lg shadow-amber-500/20"
-          style={{
-            left: `${c.left}%`,
-            width: c.size,
-            height: c.size,
-            fontSize: c.size * 0.4,
-            animation: `coin-float ${c.dur}s linear ${c.delay}s infinite`,
-          }}
-        >
-          Rp
-        </span>
-      ))}
-
-      {/* Dua gelombang, kecepatan beda biar ada parallax. */}
-      <svg
-        className="wave absolute bottom-0 left-0 h-40 w-[200%] text-emerald-500/20"
-        viewBox="0 0 1440 160"
-        preserveAspectRatio="none"
-        style={{ animation: "wave-drift 18s linear infinite" }}
-      >
-        <path
-          fill="currentColor"
-          d="M0 80 Q180 20 360 80 T720 80 T1080 80 T1440 80 V160 H0Z"
-        />
-      </svg>
-      <svg
-        className="wave absolute bottom-0 left-0 h-32 w-[200%] text-emerald-600/25"
-        viewBox="0 0 1440 160"
-        preserveAspectRatio="none"
-        style={{ animation: "wave-drift 26s linear infinite" }}
-      >
-        <path
-          fill="currentColor"
-          d="M0 100 Q180 150 360 100 T720 100 T1080 100 T1440 100 V160 H0Z"
-        />
-      </svg>
+      <canvas ref={canvasRef} className="absolute inset-0" />
     </div>
   );
 }
@@ -182,7 +264,7 @@ export default function LoginPage() {
 
   return (
     <div className="relative flex min-h-screen items-center justify-center px-4 py-10">
-      <MoneyBackground />
+      <MoneyRain />
 
       {SITE_KEY && (
         <Script

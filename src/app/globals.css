@@ -42,19 +42,3 @@ textarea::placeholder {
   outline-offset: 2px;
 }
 
-/* Latar login: koin melayang + gelombang. */
-@keyframes coin-float {
-  0% { transform: translateY(0) rotate(0deg); opacity: 0; }
-  10%, 90% { opacity: 0.55; }
-  100% { transform: translateY(-110vh) rotate(220deg); opacity: 0; }
-}
-
-@keyframes wave-drift {
-  from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .coin, .wave { animation: none !important; }
-  .coin { opacity: 0.3; }
-}
