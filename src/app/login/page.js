@@ -74,6 +74,8 @@ function MoneyBackground() {
 export default function LoginPage() {
   const router = useRouter();
   const turnstileRef = useRef(null);
+  const widgetId = useRef(null);
+  const [captchaToken, setCaptchaToken] = useState("");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -91,16 +93,51 @@ export default function LoginPage() {
     }
   }, []);
 
+  // Render eksplisit: auto-render Turnstile kadang gagal karena kepentok
+  // hydration React (elemen belum ada saat script scan DOM sekali di awal).
+  useEffect(() => {
+    if (!SITE_KEY) return;
+
+    let cancelled = false;
+
+    function render() {
+      if (cancelled || !window.turnstile || !turnstileRef.current) return;
+      if (widgetId.current) return;
+      widgetId.current = window.turnstile.render(turnstileRef.current, {
+        sitekey: SITE_KEY,
+        theme: "light",
+        callback: (token) => setCaptchaToken(token),
+        "expired-callback": () => setCaptchaToken(""),
+        "error-callback": () => setCaptchaToken(""),
+      });
+    }
+
+    if (window.turnstile) {
+      render();
+    } else {
+      const id = setInterval(() => {
+        if (window.turnstile) {
+          clearInterval(id);
+          render();
+        }
+      }, 200);
+      return () => {
+        cancelled = true;
+        clearInterval(id);
+      };
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   async function handleLogin(e) {
     e.preventDefault();
     setLoading(true);
     setError("");
 
-    const turnstileToken =
-      turnstileRef.current?.querySelector('[name="cf-turnstile-response"]')
-        ?.value || "";
-
-    if (SITE_KEY && !turnstileToken) {
+    if (SITE_KEY && !captchaToken) {
       setError("Tunggu verifikasi keamanan selesai, lalu coba lagi.");
       setLoading(false);
       return;
@@ -111,7 +148,7 @@ export default function LoginPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ email, password, remember, turnstileToken }),
+        body: JSON.stringify({ email, password, remember, turnstileToken: captchaToken }),
       });
 
       let data = {};
@@ -123,7 +160,8 @@ export default function LoginPage() {
 
       if (!res.ok) {
         setError(data?.message || data?.error || `Login gagal (${res.status})`);
-        window.turnstile?.reset();
+        if (widgetId.current) window.turnstile?.reset(widgetId.current);
+        setCaptchaToken("");
         return;
       }
 
@@ -135,7 +173,8 @@ export default function LoginPage() {
     } catch (err) {
       console.error("Login error:", err);
       setError("Tidak bisa menghubungi server. Coba lagi.");
-      window.turnstile?.reset();
+      if (widgetId.current) window.turnstile?.reset(widgetId.current);
+      setCaptchaToken("");
     } finally {
       setLoading(false);
     }
@@ -147,7 +186,7 @@ export default function LoginPage() {
 
       {SITE_KEY && (
         <Script
-          src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+          src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
           strategy="afterInteractive"
         />
       )}
@@ -247,15 +286,7 @@ export default function LoginPage() {
               Ingat saya selama 30 hari
             </label>
 
-            {SITE_KEY && (
-              <div
-                ref={turnstileRef}
-                className="cf-turnstile"
-                data-sitekey={SITE_KEY}
-                data-theme="light"
-                data-size="flexible"
-              />
-            )}
+            {SITE_KEY && <div ref={turnstileRef} />}
 
             <button
               type="submit"
